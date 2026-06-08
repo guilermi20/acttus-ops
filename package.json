@@ -1,0 +1,10 @@
+{
+  "name": "acttus-os",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Acttus OS — painel de operações (interno e clientes). Aplicação estática client-side.",
+  "scripts": {
+    "dev": "npx serve .",
+    "start": "npx serve ."
+  }
+}

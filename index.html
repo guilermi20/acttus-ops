@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acttus OS</title>
+<meta name="description" content="Acttus OS — painel de operações interno e de clientes.">
+<meta name="theme-color" content="#1B1714">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<script>window.addEventListener('error',function(e){var b=document.getElementById('errbar');if(b){b.style.display='block';b.textContent='Erro: '+(e.message||e.error);}});</script>
+</head>
+<body>
+<div id="errbar"></div>
+<div class="app">
+ <aside class="rail">
+  <div class="brand"><span class="av">A</span><div><div class="nm">Acttus</div><div class="sub">Workspace</div></div></div>
+  <div class="railact"><button class="btn pri sm" id="btnCriar"></button><button class="bell" id="btnBell"><span id="bellIc"></span><span class="bdot" id="bellDot">0</span></button></div>
+  <div class="ctxsw" id="ctxsw"><button data-c="interno" class="on">Interno</button><button data-c="clientes">Clientes</button></div>
+  <div class="sbsearch"><span id="sbSearchIc"></span><input id="navsearch" placeholder="Buscar..."></div>
+  <nav class="nav sb-scroll" id="nav"></nav>
+  <div class="railfoot"><div class="merow" id="meRow"></div><div class="out" id="logout"><span id="outIc"></span> Sair</div></div>
+ </aside>
+ <div class="main"><div class="scroll"><div class="wrap" id="view"></div></div></div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="modal" id="modal"><div class="bg" id="modalBg"></div><div class="mbox" id="mboxc"></div></div>
+<div class="pop" id="notifpop"></div>
+<div class="cmdk" id="cmdk"><div class="bg" id="cmdkbg"></div><div class="box"><div class="ip"><span id="cmdkIc"></span><input id="cmdkInput" placeholder="Buscar páginas, tarefas, clientes, documentos…"></div><div class="res" id="cmdkRes"></div></div></div>
+<script src="/app.js"></script>
+</body>
+</html>

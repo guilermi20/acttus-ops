@@ -22,7 +22,8 @@ insert into users (name, cpf, email) values
   ('Dudu',           '44444444444', 'dudu@acttus.com.br'),
   ('Leticia',        '55555555555', 'leticia@acttus.com.br'),
   ('Guilherme',      '66666666666', 'guilherme@acttus.com.br'),
-  ('Luiz',           '77777777777', 'luiz@acttus.com.br')
+  ('Luiz',           '77777777777', 'luiz@acttus.com.br'),
+  ('Bigode',         '71104368455', 'bigode@acttus.com')
 on conflict (cpf) do nothing;
 
 -- Posts de exemplo (junho/2026) — distribuição 50/30/20 (5 topo, 3 meio, 2 fundo)

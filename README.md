@@ -1,54 +1,93 @@
-# Acttus OS
+# Acttus OS — Calendário Editorial
 
-Painel de operações da Acttus (contextos **Interno** e **Clientes**). É uma aplicação
-estática 100% client-side — sem backend, sem banco de dados e sem chamadas de API.
-Toda a interface é renderizada por JavaScript no navegador.
+App full-stack para gerir o calendário editorial da agência: posts por cliente,
+funil 50/30/20, board por status, login por CPF+email, dashboards ao vivo e
+notificações de tarefas vencidas no WhatsApp (Evolution API).
+
+- **Frontend:** HTML + CSS + JS puro (sem framework) — `index.html`, `styles.css`, `app.js`, `data.js`
+- **Backend:** funções serverless da Vercel em `api/` (Node.js)
+- **Banco:** Postgres (Neon, via integração nativa da Vercel)
+- **Tempo real:** polling a cada 8s (re-renderiza quando há mudança)
+- **WhatsApp:** Evolution API, disparado por Vercel Cron (1x/dia) para tarefas vencidas
 
 ## Estrutura
 
 ```
-.
-├── index.html      # Shell HTML (markup base do app)
-├── styles.css      # Estilos (extraídos do HTML original)
-├── app.js          # Toda a lógica do app (IIFE em JS puro)
-├── vercel.json     # Configuração de deploy do Vercel
-├── package.json    # Metadados + scripts de dev local
-└── acttus-os (2).html  # Arquivo original (não vai para produção — ver .vercelignore)
+index.html  styles.css  app.js  data.js     # frontend estático
+api/                                          # funções serverless
+  login.js  users.js  clients.js  posts.js  notifications.js  cron/overdue.js
+lib/        db.js  whatsapp.js                # módulos compartilhados (não são rotas)
+db/         schema.sql  seed.sql             # banco
+scripts/    db-setup.js                       # aplica schema+seed
+vercel.json  .env.example
 ```
 
-> A única dependência externa é a fonte **Outfit**, carregada via Google Fonts.
+## Setup (passo a passo)
+
+### 1. Criar o banco (Neon na Vercel)
+Vercel → projeto **acttus-ops** → aba **Storage** → **Create Database** → **Neon (Postgres)** → conecte ao projeto.
+Isso injeta a variável `DATABASE_URL` automaticamente.
+
+### 2. Criar as tabelas + dados de exemplo
+Duas opções:
+
+**a) Pelo SQL Editor do Neon (mais simples):** abra o banco → *Open in Neon* → **SQL Editor** →
+cole e rode o conteúdo de [`db/schema.sql`](db/schema.sql), depois [`db/seed.sql`](db/seed.sql).
+
+**b) Pela CLI:**
+```bash
+vercel env pull .env.local   # puxa DATABASE_URL
+npm install
+npm run db:setup
+```
+
+### 3. Variáveis de ambiente (Vercel → Settings → Environment Variables)
+Veja [`.env.example`](.env.example). Defina:
+
+| Variável | Valor |
+|---|---|
+| `DATABASE_URL` | (criada automaticamente no passo 1) |
+| `APP_SECRET` | valor aleatório longo (assina os tokens de login) |
+| `EVOLUTION_API_URL` | `https://evolution.ordem.app.br` |
+| `EVOLUTION_API_KEY` | a sua API key da Evolution |
+| `EVOLUTION_INSTANCE` | o nome da sua instância na Evolution |
+| `EVOLUTION_GROUP_ID` | `120363428042165535@g.us` |
+| `CRON_SECRET` | valor aleatório (protege o endpoint de cron) |
+
+> A `EVOLUTION_API_KEY` **nunca** vai para o navegador nem para o git — só fica aqui.
+
+### 4. Deploy
+`git push` → a Vercel faz o deploy automático. Sem etapa de build.
+
+## Login
+Entra-se com **CPF + email** cadastrados. O seed cria logins de exemplo (CPFs placeholder):
+
+| Nome | CPF | Email |
+|---|---|---|
+| Admin | `000.000.000-00` | admin@acttus.com.br |
+| Guilherme | `666.666.666-66` | guilherme@acttus.com.br |
+
+Entre com o Admin, cadastre os usuários reais (com CPF e email de verdade) em **Usuários**,
+e depois ajuste/remova os de exemplo.
+
+## Funcionalidades
+- **Calendário** unificado por cliente — amarelo = `Acttus - Interno`, rosa = demais clientes.
+- **Posts**: board com os 6 status (Agendado → Em produção → Aguardando aprovação → Modificação → Finalizado → Postado), arrasta-e-solta.
+- **Funil 50/30/20**: distribuição topo/meio/fundo vs. meta, geral e por cliente.
+- **Campos do post**: título, cliente, etapa do funil, tipo (carrossel/reels/estático), canal (orgânico/tráfego), data, horário (12:00/18:00), responsável (lista dinâmica dos usuários), status, observações.
+- **Usuários/Clientes**: cadastro próprio. O dropdown de responsável puxa os usuários automaticamente.
+- **WhatsApp**: cron diário envia ao grupo o resumo das tarefas vencidas.
+
+## Testar o WhatsApp manualmente
+```bash
+curl "https://SEU-DOMINIO.vercel.app/api/cron/overdue?secret=SEU_CRON_SECRET"
+```
 
 ## Rodar localmente
-
-Precisa servir por HTTP (abrir o `index.html` direto via `file://` pode falhar por
-causa dos caminhos absolutos `/styles.css` e `/app.js`).
-
 ```bash
-npm run dev
-# abre em http://localhost:3000 usando "npx serve"
+npm install
+vercel dev   # requer Vercel CLI + DATABASE_URL no .env.local
 ```
 
-Ou com Python:
-
-```bash
-python -m http.server 3000
-```
-
-## Deploy no Vercel
-
-### Opção A — pelo site (mais simples)
-
-1. Suba esta pasta para um repositório no GitHub/GitLab/Bitbucket.
-2. Em [vercel.com/new](https://vercel.com/new), importe o repositório.
-3. **Framework Preset:** `Other`. Deixe *Build Command* e *Output Directory* em branco.
-4. Clique em **Deploy**.
-
-### Opção B — pela CLI
-
-```bash
-npm i -g vercel
-vercel          # preview
-vercel --prod   # produção
-```
-
-Não há etapa de build: o Vercel apenas publica os arquivos estáticos da raiz.
+> Observação: as funções e o banco Neon não rodam abrindo o `index.html` direto —
+> use `vercel dev` (ou teste no deploy). O frontend estático sozinho mostra só a tela de login.

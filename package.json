@@ -2,9 +2,16 @@
   "name": "acttus-os",
   "version": "1.0.0",
   "private": true,
-  "description": "Acttus OS — painel de operações (interno e clientes). Aplicação estática client-side.",
+  "type": "module",
+  "description": "Acttus OS — painel de operações / calendário editorial (full-stack na Vercel).",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "dev": "npx serve .",
-    "start": "npx serve ."
+    "dev": "vercel dev",
+    "db:setup": "node --env-file=.env.local scripts/db-setup.js"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.9.5"
   }
 }

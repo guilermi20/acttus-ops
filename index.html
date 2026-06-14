@@ -11,7 +11,17 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
-<script>window.addEventListener('error',function(e){var b=document.getElementById('errbar');if(b){b.style.display='block';b.textContent='Erro: '+(e.message||e.error);}});</script>
+<script>
+function acttusShowErr(msg){
+  if(/ResizeObserver loop/i.test(String(msg)))return; // aviso benigno do navegador — ignora
+  var b=document.getElementById('errbar');if(!b)return;
+  b.innerHTML='<span>Erro: '+String(msg).replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</span>'
+    +'<button type="button" onclick="this.parentNode.style.display=\'none\'" aria-label="Fechar">&#10005;</button>';
+  b.style.display='flex';
+}
+window.addEventListener('error',function(e){acttusShowErr((e&&(e.message||(e.error&&e.error.message)))||'desconhecido');});
+window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;acttusShowErr((r&&(r.message||r))||'erro de rede');});
+</script>
 </head>
 <body>
 <div id="errbar"></div>

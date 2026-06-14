@@ -1,4 +1,5 @@
 import { sql, requireAuth } from '../lib/db.js';
+import { sendText } from '../lib/whatsapp.js';
 
 const FUNNEL = ['topo', 'meio', 'fundo'];
 const TYPES = ['carrossel', 'reels', 'estatico'];
@@ -61,13 +62,24 @@ export default async function handler(req, res) {
       const o = clean(req.body || {});
       const keys = Object.keys(o);
       if (!keys.length) return res.status(400).json({ error: 'Nada para atualizar' });
+      // status anterior (para notificar mudança de coluna)
+      let prevStatus = null;
+      if (o.status) { const cur = await sql('select status from posts where id = $1', [id]); prevStatus = cur.rows[0] && cur.rows[0].status; }
       const sets = keys.map((k, i) => k + ' = $' + (i + 1)).join(', ');
       const vals = keys.map((k) => o[k]);
       vals.push(id);
       const upd = await sql('update posts set ' + sets + ', updated_at = now() where id = $' + vals.length + ' returning id', vals);
       if (!upd.rows.length) return res.status(404).json({ error: 'Post não encontrado' });
       const { rows: full } = await sql(SELECT + ' where p.id = $1', [id]);
-      return res.status(200).json(full[0]);
+      const post = full[0];
+      // mudou de coluna → avisa no grupo do WhatsApp (não falha o update se a Evolution cair)
+      if (o.status && prevStatus && prevStatus !== o.status) {
+        const msg = '🔄 *Acttus OS — mudança de status*\n*' + post.title + '* — ' + (post.client_name || 'sem cliente') +
+          '\n' + prevStatus + ' → *' + post.status + '*' + (post.responsible_name ? '\nResponsável: ' + post.responsible_name : '');
+        try { await sendText(msg); } catch (e) { /* ignora falha de envio */ }
+        try { await sql('insert into notifications (text, kind, link_post_id, whatsapp_sent) values ($1, $2, $3, $4)', ['"' + post.title + '": ' + prevStatus + ' → ' + post.status, 'status', id, true]); } catch (e) {}
+      }
+      return res.status(200).json(post);
     }
 
     if (req.method === 'DELETE') {

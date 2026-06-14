@@ -93,6 +93,7 @@
   function sortClients(a, b) { if (a.is_internal !== b.is_internal) return a.is_internal ? -1 : 1; return a.name.localeCompare(b.name); }
   function createClient(b) { return req('POST', '/api/clients', b).then(function (c) { state.clients.push(c); state.clients.sort(sortClients); emit(); return c; }); }
   function createUser(b) { return req('POST', '/api/users', b).then(function (u) { state.users.push(u); state.users.sort(function (a, b) { return a.name.localeCompare(b.name); }); emit(); return u; }); }
+  function updateUser(id, b) { return req('PATCH', '/api/users?id=' + encodeURIComponent(id), b).then(function (u) { var i = -1; for (var k = 0; k < state.users.length; k++) if (state.users[k].id === id) { i = k; break; } if (i >= 0) state.users[i] = u; state.users.sort(function (a, b) { return a.name.localeCompare(b.name); }); if (state.user && state.user.id === id) { state.user = { id: u.id, name: u.name, email: u.email }; localStorage.setItem(USER_KEY, JSON.stringify(state.user)); } emit(); return u; }); }
   function markNotifsRead() { return req('PATCH', '/api/notifications').then(function () { var now = new Date().toISOString(); state.notifications.forEach(function (n) { if (!n.read_at) n.read_at = now; }); emit(); }); }
 
   var pollTimer = null;
@@ -108,7 +109,7 @@
     login: login, logout: function () { doLogout(); emit(); },
     loadAll: loadAll, refreshPosts: refreshPosts, refreshNotifs: refreshNotifs,
     createPost: createPost, updatePost: updatePost, deletePost: deletePost,
-    createClient: createClient, createUser: createUser, markNotifsRead: markNotifsRead,
+    createClient: createClient, createUser: createUser, updateUser: updateUser, markNotifsRead: markNotifsRead,
     startPolling: startPolling, stopPolling: stopPolling,
     isAuthed: function () { return !!state.token; }
   };

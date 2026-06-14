@@ -40,7 +40,7 @@ var MONFULL = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julh
 var WD = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 var _t;
-function toast(t, kind) { var e = $('#toast'); e.className = 'toast show' + (kind ? ' ' + kind : ''); e.textContent = t; clearTimeout(_t); _t = setTimeout(function () { e.className = 'toast'; }, 3000); }
+function toast(t, kind) { var e = $('#toast'); e.className = 'toast show' + (kind ? ' ' + kind : ''); e.textContent = t; e.title = 'Clique para fechar'; e.onclick = function () { e.className = 'toast'; clearTimeout(_t); }; clearTimeout(_t); _t = setTimeout(function () { e.className = 'toast'; }, kind === 'err' ? 6000 : 3000); }
 
 /* ---------- constantes do domínio ---------- */
 var STATUS = ['Agendado', 'Em produção', 'Aguardando aprovação', 'Modificação', 'Finalizado', 'Postado'];
@@ -73,10 +73,10 @@ function avatar(name, sz) { sz = sz || 26; return '<span class="avt" title="' + 
    =================================================================== */
 var NAV = [
  { sec: 'Painel', items: [{ key: 'dashboard', label: 'Visão geral', icon: 'dashboard' }, { key: 'funil', label: 'Funil 50/30/20', icon: 'target' }] },
- { sec: 'Editorial', items: [{ key: 'calendario', label: 'Calendário', icon: 'calendar' }, { key: 'posts', label: 'Posts', icon: 'grid' }] },
+ { sec: 'Editorial', items: [{ key: 'calendario', label: 'Calendário', icon: 'calendar' }, { key: 'posts', label: 'Posts', icon: 'grid' }, { key: 'minhas', label: 'Minhas demandas', icon: 'check' }] },
  { sec: 'Cadastros', items: [{ key: 'clientes', label: 'Clientes', icon: 'building' }, { key: 'usuarios', label: 'Usuários', icon: 'users' }] }
 ];
-var VIEWS = { dashboard: renderDashboard, funil: renderFunil, calendario: renderCalendario, posts: renderPosts, clientes: renderClientes, usuarios: renderUsuarios };
+var VIEWS = { dashboard: renderDashboard, funil: renderFunil, calendario: renderCalendario, posts: renderPosts, minhas: renderMinhas, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios };
 var route = 'calendario';
 
 function go(v) { route = v; renderNav(); renderView(); }
@@ -86,7 +86,8 @@ function renderNav() {
   h += '<div class="navsec">' + esc(g.sec) + '</div>';
   g.items.forEach(function (it) {
    var cnt = navCount(it.key);
-   h += '<div class="navitem' + (route === it.key ? ' on' : '') + '" data-go="' + it.key + '">' + ic(it.icon, 18) + '<span>' + esc(it.label) + '</span>' + (cnt ? '<span class="cnt">' + cnt + '</span>' : '') + '</div>';
+   var on = route === it.key || (route === 'cliente' && it.key === 'clientes');
+   h += '<div class="navitem' + (on ? ' on' : '') + '" data-go="' + it.key + '">' + ic(it.icon, 18) + '<span>' + esc(it.label) + '</span>' + (cnt ? '<span class="cnt">' + cnt + '</span>' : '') + '</div>';
   });
  });
  $('#nav').innerHTML = h;
@@ -94,6 +95,7 @@ function renderNav() {
 }
 function navCount(k) {
  if (k === 'posts') return st.posts.length;
+ if (k === 'minhas') return st.posts.filter(function (p) { return st.user && p.responsible_id === st.user.id; }).length;
  if (k === 'clientes') return st.clients.length;
  if (k === 'usuarios') return st.users.length;
  return '';
@@ -184,7 +186,7 @@ function renderFunil(el) {
   var t = cp.length;
   var cells = FUNNEL.map(function (f) { var n = cp.filter(function (p) { return p.funnel_stage === f.key; }).length; return '<td>' + (t ? Math.round(n / t * 100) : 0) + '%</td>'; }).join('');
   var ok = FUNNEL.every(function (f) { var n = cp.filter(function (p) { return p.funnel_stage === f.key; }).length; return Math.abs((t ? Math.round(n / t * 100) : 0) - f.target) <= 10; });
-  return '<tr><td class="cn"><span class="cdot c-' + (cl.is_internal ? 'yellow' : 'pink') + '"></span>' + esc(cl.name) + '</td>' + cells + '<td>' + t + '</td><td>' + (ok ? '<span class="tag ok">ok</span>' : '<span class="tag off">ajustar</span>') + '</td></tr>';
+  return '<tr><td class="cn"><span class="cdot c-' + (cl.is_internal ? 'yellow' : 'pink') + '"></span><button class="linklike" data-cli="' + cl.id + '">' + esc(cl.name) + '</button></td>' + cells + '<td>' + t + '</td><td><button class="tag ' + (ok ? 'ok' : 'off') + '" data-cli="' + cl.id + '" title="Abrir calendário do cliente">' + (ok ? 'ok ' : 'Ajustar ') + ic('right', 12) + '</button></td></tr>';
  }).join('');
 
  var clientOpts = '<option value="">Todos os clientes</option>' + st.clients.map(function (c) { return '<option value="' + c.id + '"' + (c.id === funilClient ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('');
@@ -196,6 +198,7 @@ function renderFunil(el) {
   '<div class="panel"><div class="hd"><h3>Por cliente</h3></div><div class="bd"><table class="tbl"><thead><tr><th>Cliente</th><th>Topo</th><th>Meio</th><th>Fundo</th><th>Total</th><th>Meta</th></tr></thead><tbody>' + (rows || '<tr><td colspan="6" class="empty">Sem dados.</td></tr>') + '</tbody></table></div></div>';
 
  $('#fnCli', el).onchange = function () { funilClient = this.value; renderFunil(el); };
+ $$('[data-cli]', el).forEach(function (b) { b.onclick = function () { openCliente(b.getAttribute('data-cli')); }; });
 }
 
 /* ===================================================================
@@ -203,14 +206,14 @@ function renderFunil(el) {
    =================================================================== */
 var calY, calM, calClient = '';
 function calInit() { if (calY == null) { var t = todayISO().split('-'); calY = +t[0]; calM = +t[1] - 1; } }
-function renderCalendario(el) {
+// Monta a grade do mês (barra + dias) para uma lista de posts já filtrada.
+function calGridHTML(posts) {
  calInit();
  var first = new Date(Date.UTC(calY, calM, 1));
  var startW = first.getUTCDay();
  var days = new Date(Date.UTC(calY, calM + 1, 0)).getUTCDate();
- var posts = (calClient ? st.posts.filter(function (p) { return p.client_id === calClient; }) : st.posts).filter(function (p) { return p.pub_date; });
  var byDay = {};
- posts.forEach(function (p) { var d = p.pub_date.split('-'); if (+d[0] === calY && +d[1] - 1 === calM) { var k = +d[2]; (byDay[k] = byDay[k] || []).push(p); } });
+ posts.filter(function (p) { return p.pub_date; }).forEach(function (p) { var d = p.pub_date.split('-'); if (+d[0] === calY && +d[1] - 1 === calM) { var k = +d[2]; (byDay[k] = byDay[k] || []).push(p); } });
  Object.keys(byDay).forEach(function (k) { byDay[k].sort(function (a, b) { return (a.pub_time || '') < (b.pub_time || '') ? -1 : 1; }); });
 
  var cells = '';
@@ -220,33 +223,61 @@ function renderCalendario(el) {
   var iso = calY + '-' + String(calM + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
   var list = byDay[d] || [];
   var evs = list.map(function (p) {
-   return '<div class="cal-ev c-' + postColor(p) + '" data-post="' + p.id + '" title="' + esc(p.title) + '">' + (p.pub_time ? '<b>' + p.pub_time + '</b> ' : '') + esc(p.title) + '</div>';
+   return '<div class="cal-ev c-' + postColor(p) + '" data-post="' + p.id + '" title="' + esc(p.title + ' — ' + (p.client_name || 'Sem cliente') + ' — ' + typeLabel(p.post_type)) + '">' +
+    '<div class="ce-t">' + (p.pub_time ? '<b>' + p.pub_time + '</b> ' : '') + esc(p.title) + '</div>' +
+    '<div class="ce-m">' + esc(p.client_name || 'Sem cliente') + ' · ' + typeLabel(p.post_type) + '</div></div>';
   }).join('');
   cells += '<div class="cal-cell' + (iso === todays ? ' today' : '') + '" data-day="' + iso + '">' +
    '<div class="cal-h"><span class="cal-d">' + d + '</span><button class="cal-add" data-add="' + iso + '">+</button></div>' +
    '<div class="cal-evs">' + evs + '</div></div>';
  }
-
- var clientOpts = '<option value="">Todos os clientes</option>' + st.clients.map(function (c) { return '<option value="' + c.id + '"' + (c.id === calClient ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('');
-
- el.innerHTML = head('Calendário', 'Todos os clientes num só lugar. Amarelo = Acttus (interno) · Rosa = clientes.',
-  '<select class="select" id="calCli">' + clientOpts + '</select>' +
-  '<button class="btn pri" data-new="1">' + ic('plus') + ' Novo post</button>') +
-  '<div class="cal-bar"><button class="btn icon" id="calPrev">' + ic('left') + '</button>' +
+ return '<div class="cal-bar"><button class="btn icon" id="calPrev">' + ic('left') + '</button>' +
   '<div class="cal-title">' + MONFULL[calM] + ' ' + calY + '</div>' +
   '<button class="btn icon" id="calNext">' + ic('right') + '</button>' +
   '<button class="btn sm" id="calToday">Hoje</button>' +
   '<span class="cal-legend"><span class="cdot c-yellow"></span>Acttus &nbsp;<span class="cdot c-pink"></span>Clientes</span></div>' +
   '<div class="cal-grid head">' + WD.map(function (w) { return '<div class="cal-wd">' + w + '</div>'; }).join('') + '</div>' +
   '<div class="cal-grid">' + cells + '</div>';
-
- $('#calPrev', el).onclick = function () { calM--; if (calM < 0) { calM = 11; calY--; } renderCalendario(el); };
- $('#calNext', el).onclick = function () { calM++; if (calM > 11) { calM = 0; calY++; } renderCalendario(el); };
- $('#calToday', el).onclick = function () { var t = todayISO().split('-'); calY = +t[0]; calM = +t[1] - 1; renderCalendario(el); };
- $('#calCli', el).onchange = function () { calClient = this.value; renderCalendario(el); };
+}
+// Liga navegação do mês + clique nos eventos. rerender re-desenha a view atual.
+function bindCal(el, rerender, addClientId) {
+ $('#calPrev', el).onclick = function () { calM--; if (calM < 0) { calM = 11; calY--; } rerender(); };
+ $('#calNext', el).onclick = function () { calM++; if (calM > 11) { calM = 0; calY++; } rerender(); };
+ $('#calToday', el).onclick = function () { var t = todayISO().split('-'); calY = +t[0]; calM = +t[1] - 1; rerender(); };
  $$('[data-post]', el).forEach(function (e) { e.onclick = function (ev) { ev.stopPropagation(); var p = postById(e.getAttribute('data-post')); if (p) openPostModal(p); }; });
- $$('[data-add]', el).forEach(function (e) { e.onclick = function (ev) { ev.stopPropagation(); openPostModal(null, { pub_date: e.getAttribute('data-add'), client_id: calClient || '' }); }; });
+ $$('[data-add]', el).forEach(function (e) { e.onclick = function (ev) { ev.stopPropagation(); openPostModal(null, { pub_date: e.getAttribute('data-add'), client_id: addClientId || '' }); }; });
+}
+function renderCalendario(el) {
+ var posts = calClient ? st.posts.filter(function (p) { return p.client_id === calClient; }) : st.posts;
+ var clientOpts = '<option value="">Todos os clientes</option>' + st.clients.map(function (c) { return '<option value="' + c.id + '"' + (c.id === calClient ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('');
+ el.innerHTML = head('Calendário', 'Todos os clientes num só lugar. Amarelo = Acttus (interno) · Rosa = clientes.',
+  '<select class="select" id="calCli">' + clientOpts + '</select>' +
+  '<button class="btn pri" data-new="1">' + ic('plus') + ' Novo post</button>') +
+  calGridHTML(posts);
+ $('#calCli', el).onchange = function () { calClient = this.value; renderCalendario(el); };
+ bindCal(el, function () { renderCalendario(el); }, calClient);
  bindNew(el);
+}
+
+// ---- página de um cliente: kanban em cima + calendário embaixo ----
+var clienteId = '';
+function openCliente(id) { clienteId = id; route = 'cliente'; renderNav(); renderView(); var sc = document.querySelector('.scroll'); if (sc) sc.scrollTop = 0; }
+function renderCliente(el) {
+ var cl = clientById(clienteId);
+ if (!cl) { go('clientes'); return; }
+ var posts = st.posts.filter(function (p) { return p.client_id === cl.id; });
+ var t = posts.length, counts = { topo: 0, meio: 0, fundo: 0 };
+ posts.forEach(function (p) { counts[p.funnel_stage] = (counts[p.funnel_stage] || 0) + 1; });
+ var mix = FUNNEL.map(function (f) { return funnelMeta(f.key).short + ' ' + (t ? Math.round((counts[f.key] || 0) / t * 100) : 0) + '%'; }).join(' · ');
+ el.innerHTML = head(cl.name, (cl.is_internal ? 'Interno (Acttus) · ' : '') + t + ' post' + (t === 1 ? '' : 's') + (t ? ' · ' + mix : ''),
+  '<button class="btn" data-back="1">' + ic('left') + ' Voltar</button>' +
+  '<button class="btn pri" data-newc="1">' + ic('plus') + ' Novo post</button>') +
+  '<div class="panel"><div class="hd"><h3>Kanban</h3><span class="sp"></span><span class="sub">arraste para mudar o status</span></div><div class="bd"><div class="board">' + statusColumns(posts) + '</div></div></div>' +
+  '<div class="panel"><div class="hd"><h3>Calendário</h3></div><div class="bd">' + calGridHTML(posts) + '</div></div>';
+ $('[data-back]', el).onclick = function () { go('clientes'); };
+ $$('[data-newc]', el).forEach(function (b) { b.onclick = function () { openPostModal(null, { client_id: cl.id }); }; });
+ bindBoard(el);
+ bindCal(el, function () { renderCliente(el); }, cl.id);
 }
 
 /* ===================================================================
@@ -254,30 +285,15 @@ function renderCalendario(el) {
    =================================================================== */
 var boardCli = '', boardFunnel = '';
 var dragId = null;
-function renderPosts(el) {
- var posts = st.posts.filter(function (p) {
-  if (boardCli && p.client_id !== boardCli) return false;
-  if (boardFunnel && p.funnel_stage !== boardFunnel) return false;
-  return true;
- });
- var clientOpts = '<option value="">Todos os clientes</option>' + st.clients.map(function (c) { return '<option value="' + c.id + '"' + (c.id === boardCli ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('');
- var funnelOpts = '<option value="">Todo o funil</option>' + FUNNEL.map(function (f) { return '<option value="' + f.key + '"' + (f.key === boardFunnel ? ' selected' : '') + '>' + f.label + '</option>'; }).join('');
-
- var cols = STATUS.map(function (s) {
+// Colunas de status para um conjunto de posts (reutilizado em Posts, Minhas demandas e Cliente).
+function statusColumns(posts) {
+ return STATUS.map(function (s) {
   var list = posts.filter(function (p) { return p.status === s; });
   var cards = list.map(postCard).join('') || '<div class="kc-empty">—</div>';
   return '<div class="kcol" data-status="' + esc(s) + '"><div class="kcol-h">' + badge(s, STATUS_COLOR[s]) + '<span class="kcnt">' + list.length + '</span></div><div class="kcol-b" data-drop="' + esc(s) + '">' + cards + '</div></div>';
  }).join('');
-
- el.innerHTML = head('Posts', 'Arraste os cards entre as colunas para mudar o status.',
-  '<select class="select" id="bCli">' + clientOpts + '</select>' +
-  '<select class="select" id="bFun">' + funnelOpts + '</select>' +
-  '<button class="btn pri" data-new="1">' + ic('plus') + ' Novo post</button>') +
-  '<div class="board">' + cols + '</div>';
-
- $('#bCli', el).onchange = function () { boardCli = this.value; renderPosts(el); };
- $('#bFun', el).onchange = function () { boardFunnel = this.value; renderPosts(el); };
- bindNew(el);
+}
+function bindBoard(el) {
  $$('.kc', el).forEach(function (c) {
   c.onclick = function () { var p = postById(c.getAttribute('data-id')); if (p) openPostModal(p); };
   c.ondragstart = function (e) { dragId = c.getAttribute('data-id'); c.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; };
@@ -290,9 +306,41 @@ function renderPosts(el) {
    e.preventDefault(); z.classList.remove('over');
    var status = z.getAttribute('data-drop'); var id = dragId;
    if (!id) return; var p = postById(id); if (!p || p.status === status) return;
-   S.updatePost(id, { status: status }).then(function () { toast('Status: ' + status); }).catch(function (er) { toast(er.message, 'err'); });
+   S.updatePost(id, { status: status }).then(function () { toast('Status: ' + status + ' · grupo avisado no WhatsApp'); }).catch(function (er) { toast(er.message, 'err'); });
   };
  });
+}
+function renderPosts(el) {
+ var posts = st.posts.filter(function (p) {
+  if (boardCli && p.client_id !== boardCli) return false;
+  if (boardFunnel && p.funnel_stage !== boardFunnel) return false;
+  return true;
+ });
+ var clientOpts = '<option value="">Todos os clientes</option>' + st.clients.map(function (c) { return '<option value="' + c.id + '"' + (c.id === boardCli ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('');
+ var funnelOpts = '<option value="">Todo o funil</option>' + FUNNEL.map(function (f) { return '<option value="' + f.key + '"' + (f.key === boardFunnel ? ' selected' : '') + '>' + f.label + '</option>'; }).join('');
+
+ el.innerHTML = head('Posts', 'Arraste os cards entre as colunas — a mudança de status é avisada no grupo do WhatsApp.',
+  '<select class="select" id="bCli">' + clientOpts + '</select>' +
+  '<select class="select" id="bFun">' + funnelOpts + '</select>' +
+  '<button class="btn pri" data-new="1">' + ic('plus') + ' Novo post</button>') +
+  '<div class="board">' + statusColumns(posts) + '</div>';
+
+ $('#bCli', el).onchange = function () { boardCli = this.value; renderPosts(el); };
+ $('#bFun', el).onchange = function () { boardFunnel = this.value; renderPosts(el); };
+ bindNew(el); bindBoard(el);
+}
+function renderMinhas(el) {
+ var me = st.user || {};
+ var mine = st.posts.filter(function (p) { return p.responsible_id === me.id; });
+ var total = mine.length;
+ var venc = mine.filter(isOverdue).length;
+ var prox = mine.filter(function (p) { return p.pub_date && p.pub_date >= todayISO() && p.status !== 'Postado'; }).length;
+ el.innerHTML = head('Minhas demandas', 'Posts em que você é o responsável' + (me.name ? ' — ' + esc(me.name) : '') + '.',
+  '<button class="btn pri" data-newmine="1">' + ic('plus') + ' Novo post</button>') +
+  '<div class="kpis">' + kpi('Minhas', total, 'no total') + kpi('A publicar', prox, 'agendadas à frente', 'blue') + kpi('Vencidas', venc, 'data passou, não postado', venc ? 'red' : 'gray') + '</div>' +
+  (total ? '<div class="board">' + statusColumns(mine) + '</div>' : '<div class="panel"><div class="bd"><div class="empty">Você não tem demandas atribuídas a você.</div></div></div>');
+ $$('[data-newmine]', el).forEach(function (b) { b.onclick = function () { openPostModal(null, { responsible_id: me.id }); }; });
+ bindBoard(el);
 }
 function postCard(p) {
  var c = postColor(p);
@@ -309,12 +357,13 @@ function postCard(p) {
 function renderClientes(el) {
  var rows = st.clients.map(function (c) {
   var n = st.posts.filter(function (p) { return p.client_id === c.id; }).length;
-  return '<div class="lrow"><span class="cdot c-' + (c.is_internal ? 'yellow' : 'pink') + '"></span><div class="tx"><div class="t">' + esc(c.name) + '</div><div class="m">' + (c.is_internal ? 'Interno (Acttus)' : 'Cliente') + '</div></div><div class="rt"><span class="sub">' + n + ' posts</span></div></div>';
+  return '<div class="lrow click" data-cli="' + c.id + '"><span class="cdot c-' + (c.is_internal ? 'yellow' : 'pink') + '"></span><div class="tx"><div class="t">' + esc(c.name) + '</div><div class="m">' + (c.is_internal ? 'Interno (Acttus)' : 'Cliente') + '</div></div><div class="rt"><span class="sub">' + n + ' posts</span><span class="open-link">abrir ' + ic('right', 13) + '</span></div></div>';
  }).join('') || '<div class="empty">Nenhum cliente ainda.</div>';
- el.innerHTML = head('Clientes', 'Clientes do calendário editorial. "Acttus - Interno" aparece em amarelo.',
+ el.innerHTML = head('Clientes', 'Clique num cliente para ver o kanban e o calendário só dele. Amarelo = Acttus (interno).',
   '<button class="btn pri" id="newCli">' + ic('plus') + ' Novo cliente</button>') +
   '<div class="panel"><div class="bd">' + rows + '</div></div>';
  $('#newCli', el).onclick = openClientModal;
+ $$('[data-cli]', el).forEach(function (r) { r.onclick = function () { openCliente(r.getAttribute('data-cli')); }; });
 }
 function openClientModal() {
  openModal('Novo cliente', ic('building'),
@@ -332,26 +381,29 @@ function openClientModal() {
    =================================================================== */
 function renderUsuarios(el) {
  var rows = st.users.map(function (u) {
-  return '<div class="lrow">' + avatar(u.name, 30) + '<div class="tx"><div class="t">' + esc(u.name) + '</div><div class="m">' + esc(u.email) + '</div></div></div>';
+  return '<div class="lrow click" data-usr="' + u.id + '">' + avatar(u.name, 30) + '<div class="tx"><div class="t">' + esc(u.name) + '</div><div class="m">' + esc(u.email) + '</div></div><div class="rt"><span class="open-link">editar ' + ic('edit', 13) + '</span></div></div>';
  }).join('') || '<div class="empty">Nenhum usuário ainda.</div>';
- el.innerHTML = head('Usuários', 'Quem acessa o sistema. O login é feito com CPF + email.',
+ el.innerHTML = head('Usuários', 'Quem acessa o sistema. Clique num usuário para editar. Login = CPF + email.',
   '<button class="btn pri" id="newUsr">' + ic('plus') + ' Novo usuário</button>') +
   '<div class="note">' + ic('alert', 15) + ' Cada usuário entra com o <b>CPF</b> e o <b>email</b> cadastrados aqui. Guarde esses dados.</div>' +
   '<div class="panel"><div class="bd">' + rows + '</div></div>';
- $('#newUsr', el).onclick = openUserModal;
+ $('#newUsr', el).onclick = function () { openUserModal(null); };
+ $$('[data-usr]', el).forEach(function (r) { r.onclick = function () { var id = r.getAttribute('data-usr'), u = null; for (var i = 0; i < st.users.length; i++) if (st.users[i].id === id) u = st.users[i]; if (u) openUserModal(u); }; });
 }
-function openUserModal() {
- openModal('Novo usuário', ic('users'),
-  '<label class="fld"><span>Nome</span><input id="uNome" placeholder="Nome completo"></label>' +
-  '<label class="fld"><span>CPF</span><input id="uCpf" inputmode="numeric" placeholder="000.000.000-00"></label>' +
-  '<label class="fld"><span>Email</span><input id="uEmail" type="email" placeholder="pessoa@acttus.com.br"></label>',
+function openUserModal(user) {
+ var u = user || {}, editing = !!user;
+ openModal(editing ? 'Editar usuário' : 'Novo usuário', ic('users'),
+  '<label class="fld"><span>Nome</span><input id="uNome" value="' + esc(u.name || '') + '" placeholder="Nome completo"></label>' +
+  '<label class="fld"><span>CPF</span><input id="uCpf" inputmode="numeric" value="' + esc(u.cpf || '') + '" placeholder="000.000.000-00"></label>' +
+  '<label class="fld"><span>Email</span><input id="uEmail" type="email" value="' + esc(u.email || '') + '" placeholder="pessoa@acttus.com.br"></label>',
   function () {
    var name = $('#uNome').value.trim(), cpf = onlyDigits($('#uCpf').value), email = $('#uEmail').value.trim();
    if (!name || !cpf || !email) { toast('Preencha nome, CPF e email', 'err'); return false; }
    if (cpf.length !== 11) { toast('CPF deve ter 11 dígitos', 'err'); return false; }
-   S.createUser({ name: name, cpf: cpf, email: email }).then(function () { toast('Usuário criado'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
+   var op = editing ? S.updateUser(user.id, { name: name, cpf: cpf, email: email }) : S.createUser({ name: name, cpf: cpf, email: email });
+   op.then(function () { toast(editing ? 'Usuário atualizado' : 'Usuário criado'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
    return false;
-  }, 'Criar usuário');
+  }, editing ? 'Salvar' : 'Criar usuário');
 }
 
 /* ===================================================================
@@ -377,7 +429,7 @@ function openPostModal(post, defaults) {
   pub_time: p.pub_time || '12:00'
  };
  var clientOpts = st.clients.map(function (c) { return '<option value="' + c.id + '"' + (c.id === cur.client_id ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('');
- var userOpts = '<option value="">Sem responsável</option>' + st.users.map(function (u) { return '<option value="' + u.id + '"' + (u.id === (p.responsible_id || '') ? ' selected' : '') + '>' + esc(u.name) + '</option>'; }).join('');
+ var userOpts = '<option value="">Sem responsável</option>' + st.users.map(function (u) { return '<option value="' + u.id + '"' + (u.id === (p.responsible_id || d.responsible_id || '') ? ' selected' : '') + '>' + esc(u.name) + '</option>'; }).join('');
  var statusOpts = STATUS.map(function (s) { return '<option value="' + esc(s) + '"' + (s === cur.status ? ' selected' : '') + '>' + esc(s) + '</option>'; }).join('');
  var timeOpts = TIMES.map(function (t) { return '<option value="' + t + '"' + (t === cur.pub_time ? ' selected' : '') + '>' + t + '</option>'; }).join('');
 

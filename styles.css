@@ -21,7 +21,10 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--f);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
-#errbar{display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--red);color:#fff;padding:8px 14px;font-size:13px}
+#errbar{display:none;align-items:center;gap:12px;position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--red);color:#fff;padding:8px 14px;font-size:13px}
+#errbar span{flex:1;min-width:0}
+#errbar button{flex:0 0 auto;background:rgba(0,0,0,.22);border:0;color:#fff;border-radius:6px;width:24px;height:24px;font-size:12px;line-height:1;cursor:pointer}
+#errbar button:hover{background:rgba(0,0,0,.4)}
 svg.i{display:inline-block;vertical-align:-3px;flex:0 0 auto}
 button{font-family:var(--f);cursor:pointer}
 input,select,textarea{font-family:var(--f)}
@@ -202,11 +205,13 @@ select.select{appearance:none;-webkit-appearance:none;padding-right:30px;backgro
 .cal-cell:hover .cal-add{opacity:1}
 .cal-add:hover{background:var(--yellow);color:var(--yellow-ink)}
 .cal-evs{display:flex;flex-direction:column;gap:4px;overflow:hidden}
-.cal-ev{font-size:11.5px;font-weight:600;border-radius:6px;padding:3px 6px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:3px solid}
+.cal-ev{font-size:11.5px;font-weight:600;border-radius:6px;padding:3px 7px;cursor:pointer;overflow:hidden;border-left:3px solid}
 .cal-ev b{font-weight:800}
+.cal-ev .ce-t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-ev .ce-m{font-size:10px;font-weight:500;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
 .cal-ev.c-yellow{background:var(--yellow-soft);border-color:var(--yellow);color:#F7CB4A}
 .cal-ev.c-pink{background:var(--pink-soft);border-color:var(--pink);color:#F08CC4}
-@media(max-width:760px){.cal-cell{min-height:84px}.cal-ev{font-size:10px}}
+@media(max-width:760px){.cal-cell{min-height:84px}.cal-ev{font-size:10px}.cal-ev .ce-m{display:none}}
 
 /* ---------- BOARD ---------- */
 .board{display:grid;grid-template-columns:repeat(6,minmax(200px,1fr));gap:12px;margin-top:18px;overflow-x:auto;padding-bottom:8px}
@@ -293,3 +298,14 @@ body.light .cal-ev.c-pink{color:#B0246F}
 body.light .toast{background:#FFFFFF;color:#1A1714}
 body.light ::-webkit-scrollbar-thumb{background:#D9D0C0}
 body.light .sb-scroll::-webkit-scrollbar-thumb{background:#E0D8C8}
+
+/* ---------- elementos interativos extras ---------- */
+.sp{flex:1}
+.lrow.click{cursor:pointer;transition:.12s;border-radius:10px;padding-left:8px;padding-right:8px}
+.lrow.click:hover{background:var(--panel2)}
+.open-link{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:600;color:var(--yellow)}
+.linklike{background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--ink);cursor:pointer}
+.linklike:hover{color:var(--yellow);text-decoration:underline}
+button.tag{border:0;cursor:pointer;display:inline-flex;align-items:center;gap:3px;font-family:inherit}
+button.tag.off:hover{background:var(--amber);color:var(--yellow-ink)}
+button.tag.ok:hover{filter:brightness(1.1)}

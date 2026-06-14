@@ -5,6 +5,21 @@ create table if not exists clients (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
   is_internal boolean not null default false,
+  share_token text,
+  cover_url text,
+  avatar_url text,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists clients_share_token_idx on clients(share_token);
+
+-- Banco de ideias (sugestões de clientes pelo painel + ideias internas)
+create table if not exists ideas (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references clients(id) on delete set null,
+  title text not null,
+  notes text not null default '',
+  status text not null default 'nova',
+  source text not null default 'painel',
   created_at timestamptz not null default now()
 );
 

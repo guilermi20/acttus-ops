@@ -7,7 +7,7 @@
   var state = {
     token: localStorage.getItem(TOKEN_KEY) || null,
     user: null,
-    clients: [], users: [], posts: [], notifications: [], meetings: [], routines: [], projects: [], projectTasks: [],
+    clients: [], users: [], posts: [], notifications: [], meetings: [], routines: [], projects: [], projectTasks: [], ideas: [],
     serverNow: null, sig: '', loaded: false
   };
   try { state.user = JSON.parse(localStorage.getItem(USER_KEY) || 'null'); } catch (e) {}
@@ -60,7 +60,8 @@
       req('GET', '/api/meetings'),
       req('GET', '/api/routines'),
       req('GET', '/api/projects'),
-      req('GET', '/api/project-tasks')
+      req('GET', '/api/project-tasks'),
+      req('GET', '/api/ideas')
     ]);
     state.clients = r[0] || [];
     state.users = r[1] || [];
@@ -71,6 +72,7 @@
     state.routines = r[5] || [];
     state.projects = r[6] || [];
     state.projectTasks = r[7] || [];
+    state.ideas = r[8] || [];
     state.sig = sigOf(state.posts);
     state.loaded = true;
     emit();
@@ -100,6 +102,10 @@
 
   function sortClients(a, b) { if (a.is_internal !== b.is_internal) return a.is_internal ? -1 : 1; return a.name.localeCompare(b.name); }
   function createClient(b) { return req('POST', '/api/clients', b).then(function (c) { state.clients.push(c); state.clients.sort(sortClients); emit(); return c; }); }
+  function updateClient(id, b) { return req('PATCH', '/api/clients?id=' + encodeURIComponent(id), b).then(function (c) { var i = -1; for (var k = 0; k < state.clients.length; k++) if (state.clients[k].id === id) { i = k; break; } if (i >= 0) state.clients[i] = c; state.clients.sort(sortClients); emit(); return c; }); }
+  function createIdea(b) { return req('POST', '/api/ideas', b).then(function (x) { state.ideas.unshift(x); emit(); return x; }); }
+  function updateIdea(id, b) { return req('PATCH', '/api/ideas?id=' + encodeURIComponent(id), b).then(function (x) { var i = -1; for (var k = 0; k < state.ideas.length; k++) if (state.ideas[k].id === id) { i = k; break; } if (i >= 0) state.ideas[i] = x; emit(); return x; }); }
+  function deleteIdea(id) { return req('DELETE', '/api/ideas?id=' + encodeURIComponent(id)).then(function () { state.ideas = state.ideas.filter(function (x) { return x.id !== id; }); emit(); }); }
   function createUser(b) { return req('POST', '/api/users', b).then(function (u) { state.users.push(u); state.users.sort(function (a, b) { return a.name.localeCompare(b.name); }); emit(); return u; }); }
   function updateUser(id, b) { return req('PATCH', '/api/users?id=' + encodeURIComponent(id), b).then(function (u) { var i = -1; for (var k = 0; k < state.users.length; k++) if (state.users[k].id === id) { i = k; break; } if (i >= 0) state.users[i] = u; state.users.sort(function (a, b) { return a.name.localeCompare(b.name); }); if (state.user && state.user.id === id) { state.user = { id: u.id, name: u.name, email: u.email, role: u.role || state.user.role }; localStorage.setItem(USER_KEY, JSON.stringify(state.user)); } emit(); return u; }); }
   function markNotifsRead() { return req('PATCH', '/api/notifications').then(function () { var now = new Date().toISOString(); state.notifications.forEach(function (n) { if (!n.read_at) n.read_at = now; }); emit(); }); }
@@ -131,7 +137,8 @@
     login: login, logout: function () { doLogout(); emit(); },
     loadAll: loadAll, refreshPosts: refreshPosts, refreshNotifs: refreshNotifs,
     createPost: createPost, updatePost: updatePost, deletePost: deletePost,
-    createClient: createClient, createUser: createUser, updateUser: updateUser, markNotifsRead: markNotifsRead,
+    createClient: createClient, updateClient: updateClient, createUser: createUser, updateUser: updateUser, markNotifsRead: markNotifsRead,
+    createIdea: createIdea, updateIdea: updateIdea, deleteIdea: deleteIdea,
     createMeeting: createMeeting, updateMeeting: updateMeeting, deleteMeeting: deleteMeeting,
     createRoutine: createRoutine, updateRoutine: updateRoutine, deleteRoutine: deleteRoutine,
     createProject: createProject, updateProject: updateProject, deleteProject: deleteProject,

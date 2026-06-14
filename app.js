@@ -28,6 +28,7 @@ var ICONS = {
  book:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
  chart:'<line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>',
+ link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
  moon:'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
  sun:'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>'
 };
@@ -81,11 +82,11 @@ function avatar(name, sz) { sz = sz || 26; return '<span class="avt" title="' + 
    =================================================================== */
 var NAV = [
  { sec: 'Painel', admin: true, items: [{ key: 'dashboard', label: 'Visão geral', icon: 'dashboard' }, { key: 'funil', label: 'Funil 50/30/20', icon: 'target' }, { key: 'dashboards', label: 'Dashboards', icon: 'chart' }] },
- { sec: 'Editorial', items: [{ key: 'calendario', label: 'Calendário', icon: 'calendar' }, { key: 'posts', label: 'Posts', icon: 'grid' }, { key: 'minhas', label: 'Minhas demandas', icon: 'check' }, { key: 'rotinas', label: 'Rotinas', icon: 'clock' }] },
+ { sec: 'Editorial', items: [{ key: 'calendario', label: 'Calendário', icon: 'calendar' }, { key: 'posts', label: 'Posts', icon: 'grid' }, { key: 'minhas', label: 'Minhas demandas', icon: 'check' }, { key: 'rotinas', label: 'Rotinas', icon: 'clock' }, { key: 'ideias', label: 'Banco de ideias', icon: 'zap' }] },
  { sec: 'Operação', items: [{ key: 'projetos', label: 'Projetos', icon: 'folder' }, { key: 'reunioes', label: 'Reuniões', icon: 'book' }] },
  { sec: 'Cadastros', items: [{ key: 'clientes', label: 'Clientes', icon: 'building' }, { key: 'usuarios', label: 'Usuários', icon: 'users' }] }
 ];
-var VIEWS = { dashboard: renderDashboard, funil: renderFunil, dashboards: renderDashboards, calendario: renderCalendario, posts: renderPosts, minhas: renderMinhas, rotinas: renderRotinas, projetos: renderProjetos, projeto: renderProjeto, reunioes: renderReunioes, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios };
+var VIEWS = { dashboard: renderDashboard, funil: renderFunil, dashboards: renderDashboards, calendario: renderCalendario, posts: renderPosts, minhas: renderMinhas, rotinas: renderRotinas, ideias: renderIdeias, projetos: renderProjetos, projeto: renderProjeto, reunioes: renderReunioes, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios };
 var ADMIN_ROUTES = { dashboard: 1, funil: 1, dashboards: 1 };
 var route = 'calendario';
 
@@ -110,6 +111,7 @@ function navCount(k) {
  if (k === 'posts') return st.posts.length;
  if (k === 'minhas') return st.posts.filter(function (p) { return st.user && p.responsible_id === st.user.id; }).length;
  if (k === 'rotinas') return st.routines.filter(function (r) { return st.user && r.owner_id === st.user.id && !r.done; }).length;
+ if (k === 'ideias') return st.ideas.filter(function (i) { return i.status === 'nova'; }).length;
  if (k === 'clientes') return st.clients.length;
  if (k === 'usuarios') return st.users.length;
  return '';
@@ -285,10 +287,14 @@ function renderCliente(el) {
  var mix = FUNNEL.map(function (f) { return funnelMeta(f.key).short + ' ' + (t ? Math.round((counts[f.key] || 0) / t * 100) : 0) + '%'; }).join(' · ');
  el.innerHTML = head(cl.name, (cl.is_internal ? 'Interno (Acttus) · ' : '') + t + ' post' + (t === 1 ? '' : 's') + (t ? ' · ' + mix : ''),
   '<button class="btn" data-back="1">' + ic('left') + ' Voltar</button>' +
+  '<button class="btn" data-clilink="' + esc(cl.share_token || '') + '">' + ic('link', 15) + ' Link do painel</button>' +
+  '<button class="btn" data-cliedit2="1">' + ic('edit', 15) + ' Editar</button>' +
   '<button class="btn pri" data-newc="1">' + ic('plus') + ' Novo post</button>') +
   '<div class="panel"><div class="hd"><h3>Kanban</h3><span class="sp"></span><span class="sub">arraste para mudar o status</span></div><div class="bd"><div class="board">' + statusColumns(posts) + '</div></div></div>' +
   '<div class="panel"><div class="hd"><h3>Calendário</h3></div><div class="bd">' + calGridHTML(posts) + '</div></div>';
  $('[data-back]', el).onclick = function () { go('clientes'); };
+ var clk = $('[data-clilink]', el); if (clk) clk.onclick = function () { copyPanelLink(cl.share_token); };
+ var ced = $('[data-cliedit2]', el); if (ced) ced.onclick = function () { openClientModal(cl); };
  $$('[data-newc]', el).forEach(function (b) { b.onclick = function () { openPostModal(null, { client_id: cl.id }); }; });
  bindBoard(el);
  bindCal(el, function () { renderCliente(el); }, cl.id);
@@ -436,26 +442,49 @@ function postCard(p) {
 /* ===================================================================
    CLIENTES
    =================================================================== */
+function clientAvatar(c, sz) {
+ sz = sz || 30;
+ if (c.avatar_url) return '<span class="cliav" style="width:' + sz + 'px;height:' + sz + 'px;background-image:url(' + JSON.stringify(c.avatar_url) + ')"></span>';
+ return '<span class="cliav ph c-' + (c.is_internal ? 'yellow' : 'pink') + '" style="width:' + sz + 'px;height:' + sz + 'px;font-size:' + Math.round(sz * 0.42) + 'px">' + esc((c.name || '?').charAt(0).toUpperCase()) + '</span>';
+}
+function copyPanelLink(token) {
+ if (!token) { toast('Cliente sem link ainda', 'err'); return; }
+ var url = location.origin + '/cliente?t=' + token;
+ if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(function () { toast('Link do painel copiado', url); }).catch(function () { prompt('Link do painel do cliente:', url); });
+ else prompt('Link do painel do cliente:', url);
+}
 function renderClientes(el) {
  var rows = st.clients.map(function (c) {
   var n = st.posts.filter(function (p) { return p.client_id === c.id; }).length;
-  return '<div class="lrow click" data-cli="' + c.id + '"><span class="cdot c-' + (c.is_internal ? 'yellow' : 'pink') + '"></span><div class="tx"><div class="t">' + esc(c.name) + '</div><div class="m">' + (c.is_internal ? 'Interno (Acttus)' : 'Cliente') + '</div></div><div class="rt"><span class="sub">' + n + ' posts</span><span class="open-link">abrir ' + ic('right', 13) + '</span></div></div>';
+  return '<div class="lrow click" data-cli="' + c.id + '">' + clientAvatar(c, 32) +
+   '<div class="tx"><div class="t">' + esc(c.name) + '</div><div class="m">' + (c.is_internal ? 'Interno (Acttus)' : 'Cliente') + ' · ' + n + ' posts</div></div>' +
+   '<div class="rt rowacts">' +
+    '<button class="iconbtn" data-clilink="' + esc(c.share_token || '') + '" title="Copiar link do painel do cliente">' + ic('link', 16) + '</button>' +
+    '<button class="iconbtn" data-cliedit="' + c.id + '" title="Editar cliente">' + ic('edit', 16) + '</button>' +
+    '<span class="open-link">abrir ' + ic('right', 13) + '</span></div></div>';
  }).join('') || '<div class="empty">Nenhum cliente ainda.</div>';
- el.innerHTML = head('Clientes', 'Clique num cliente para ver o kanban e o calendário só dele. Amarelo = Acttus (interno).',
+ el.innerHTML = head('Clientes', 'Clique no cliente para o kanban e o calendário dele. Use o 🔗 para compartilhar o painel (só visualização).',
   '<button class="btn pri" id="newCli">' + ic('plus') + ' Novo cliente</button>') +
   '<div class="panel"><div class="bd">' + rows + '</div></div>';
- $('#newCli', el).onclick = openClientModal;
+ $('#newCli', el).onclick = function () { openClientModal(null); };
  $$('[data-cli]', el).forEach(function (r) { r.onclick = function () { openCliente(r.getAttribute('data-cli')); }; });
+ $$('[data-cliedit]', el).forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); var c = clientById(b.getAttribute('data-cliedit')); if (c) openClientModal(c); }; });
+ $$('[data-clilink]', el).forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); copyPanelLink(b.getAttribute('data-clilink')); }; });
 }
-function openClientModal() {
- openModal('Novo cliente', ic('building'),
-  '<label class="fld"><span>Nome do cliente</span><input id="cNome" placeholder="Ex.: Escritório Silva"></label>' +
-  '<label class="chk"><input type="checkbox" id="cInt"> É interno (Acttus) — aparece em amarelo</label>',
+function openClientModal(cli) {
+ var c = cli || {}, editing = !!cli;
+ openModal(editing ? 'Editar cliente' : 'Novo cliente', ic('building'),
+  '<label class="fld"><span>Nome do cliente</span><input id="cNome" value="' + esc(c.name || '') + '" placeholder="Ex.: Escritório Silva"></label>' +
+  '<label class="chk"><input type="checkbox" id="cInt"' + (c.is_internal ? ' checked' : '') + '> É interno (Acttus) — aparece em amarelo</label>' +
+  '<label class="fld"><span>URL da foto de perfil</span><input id="cAvatar" value="' + esc(c.avatar_url || '') + '" placeholder="https://…/logo.png"></label>' +
+  '<label class="fld"><span>URL da capa</span><input id="cCover" value="' + esc(c.cover_url || '') + '" placeholder="https://…/capa.jpg"></label>',
   function () {
    var name = $('#cNome').value.trim(); if (!name) { toast('Informe o nome', 'err'); return false; }
-   S.createClient({ name: name, is_internal: $('#cInt').checked }).then(function () { toast('Cliente criado'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
+   var payload = { name: name, is_internal: $('#cInt').checked, avatar_url: $('#cAvatar').value.trim() || null, cover_url: $('#cCover').value.trim() || null };
+   var op = editing ? S.updateClient(cli.id, payload) : S.createClient(payload);
+   op.then(function () { toast(editing ? 'Cliente salvo' : 'Cliente criado'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
    return false;
-  }, 'Criar cliente');
+  }, editing ? 'Salvar' : 'Criar cliente');
 }
 
 /* ===================================================================
@@ -668,6 +697,42 @@ function renderDashboards(el) {
 }
 
 /* ===================================================================
+   BANCO DE IDEIAS
+   =================================================================== */
+function ideaById(id) { for (var i = 0; i < st.ideas.length; i++) if (st.ideas[i].id === id) return st.ideas[i]; return null; }
+function renderIdeias(el) {
+ var sc = { nova: 'amber', usada: 'green', descartada: 'gray', aprovada: 'blue' };
+ var rows = st.ideas.map(function (i) {
+  return '<div class="idea"><div class="idea-top"><span class="cdot c-' + (i.is_internal ? 'yellow' : (i.client_id ? 'pink' : 'gray')) + '"></span><b>' + esc(i.client_name || 'Sem cliente') + '</b><span class="bg c-' + (sc[i.status] || 'gray') + '" style="margin-left:auto">' + esc(i.status) + '</span></div>' +
+   '<div class="idea-t">' + esc(i.title) + '</div>' + (i.notes ? '<div class="idea-n">' + esc(i.notes) + '</div>' : '') +
+   '<div class="idea-ft"><span class="sub">' + (i.source === 'painel' ? '💡 sugerida pelo cliente' : 'interna') + '</span><span class="sp"></span>' +
+    '<button class="btn sm pri" data-ireuse="' + i.id + '">' + ic('plus', 13) + ' Usar no calendário</button>' +
+    (i.status === 'descartada' ? '' : '<button class="btn sm" data-idiscard="' + i.id + '">Descartar</button>') +
+    '<button class="iconbtn" data-idel="' + i.id + '" title="Excluir">' + ic('trash', 14) + '</button></div></div>';
+ }).join('') || '<div class="empty">Nenhuma ideia ainda. As sugestões dos clientes (pelo painel) e as ideias internas aparecem aqui.</div>';
+ el.innerHTML = head('Banco de ideias', 'Sugestões de todos os clientes, unificadas. Reaproveite qualquer ideia em qualquer calendário.',
+  '<button class="btn pri" id="newIdea">' + ic('plus') + ' Nova ideia</button>') +
+  '<div class="ideas">' + rows + '</div>';
+ $('#newIdea', el).onclick = function () { openIdeaModal(); };
+ $$('[data-ireuse]', el).forEach(function (b) { b.onclick = function () { var i = ideaById(b.getAttribute('data-ireuse')); if (i) reuseIdea(i); }; });
+ $$('[data-idiscard]', el).forEach(function (b) { b.onclick = function () { S.updateIdea(b.getAttribute('data-idiscard'), { status: 'descartada' }).then(function () { toast('Ideia descartada'); }).catch(function (e) { toast(e.message, 'err'); }); }; });
+ $$('[data-idel]', el).forEach(function (b) { b.onclick = function () { if (!confirm('Excluir esta ideia?')) return; S.deleteIdea(b.getAttribute('data-idel')).then(function () { toast('Ideia excluída'); }).catch(function (e) { toast(e.message, 'err'); }); }; });
+}
+function reuseIdea(i) { openPostModal(null, { client_id: i.client_id || '', title: i.title, notes: i.notes || '', ideaId: i.id }); }
+function openIdeaModal() {
+ var clientOpts = '<option value="">Sem cliente</option>' + st.clients.map(function (c) { return '<option value="' + c.id + '">' + esc(c.name) + '</option>'; }).join('');
+ openModal('Nova ideia', ic('zap'),
+  '<label class="fld"><span>Cliente (opcional)</span><select id="idCli">' + clientOpts + '</select></label>' +
+  '<label class="fld"><span>Ideia</span><input id="idTitle" placeholder="Tema / título da ideia"></label>' +
+  '<label class="fld"><span>Notas</span><textarea id="idNotes" rows="3" placeholder="Detalhes (opcional)"></textarea></label>',
+  function () {
+   var title = $('#idTitle').value.trim(); if (!title) { toast('Descreva a ideia', 'err'); return false; }
+   S.createIdea({ client_id: $('#idCli').value || null, title: title, notes: $('#idNotes').value }).then(function () { toast('Ideia adicionada'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
+   return false;
+  }, 'Adicionar');
+}
+
+/* ===================================================================
    MODAL DE POST (criar/editar)
    =================================================================== */
 function bindNew(el) { $$('[data-new]', el).forEach(function (b) { b.onclick = function () { openPostModal(null); }; }); }
@@ -695,7 +760,7 @@ function openPostModal(post, defaults) {
  var timeOpts = TIMES.map(function (t) { return '<option value="' + t + '"' + (t === cur.pub_time ? ' selected' : '') + '>' + t + '</option>'; }).join('');
 
  var body =
-  '<label class="fld"><span>Título do post</span><input id="pTitle" value="' + esc(p.title || '') + '" placeholder="Ex.: 3 dúvidas sobre..."></label>' +
+  '<label class="fld"><span>Título do post</span><input id="pTitle" value="' + esc(p.title || d.title || '') + '" placeholder="Ex.: 3 dúvidas sobre..."></label>' +
   '<div class="mrow2"><label class="fld"><span>Cliente</span><select id="pClient">' + (clientOpts || '<option value="">Crie um cliente antes</option>') + '</select></label>' +
   '<label class="fld"><span>Responsável</span><select id="pResp">' + userOpts + '</select></label></div>' +
   '<div class="fld"><span>Etapa do funil</span>' + seg('funnel_stage', FUNNEL.map(function (f) { return { key: f.key, label: f.short }; }), cur.funnel_stage) + '</div>' +
@@ -705,7 +770,7 @@ function openPostModal(post, defaults) {
   '<label class="fld"><span>Prazo de conclusão</span><input type="date" id="pDue" value="' + esc(p.due_date || '') + '"></label></div>' +
   '<div class="mrow2"><label class="fld"><span>Horário</span><select id="pTime">' + timeOpts + '</select></label>' +
   '<label class="fld"><span>Status</span><select id="pStatus">' + statusOpts + '</select></label></div>' +
-  '<label class="fld"><span>Observações</span><textarea id="pNotes" rows="3" placeholder="Briefing, links, referências...">' + esc(p.notes || '') + '</textarea></label>';
+  '<label class="fld"><span>Observações</span><textarea id="pNotes" rows="3" placeholder="Briefing, links, referências...">' + esc(p.notes || d.notes || '') + '</textarea></label>';
 
  var extra = editing ? '<button class="btn danger" id="pDel">' + ic('trash', 15) + ' Excluir</button>' : '';
  openModal(editing ? 'Editar post' : 'Novo post', ic('calendar'), body, function () {
@@ -719,7 +784,7 @@ function openPostModal(post, defaults) {
   };
   if (!payload.title) { toast('Informe o título', 'err'); return false; }
   var op = editing ? S.updatePost(post.id, payload) : S.createPost(payload);
-  op.then(function () { toast(editing ? 'Post atualizado' : 'Post criado'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
+  op.then(function () { if (!editing && d.ideaId) { S.updateIdea(d.ideaId, { status: 'usada' }).catch(function () {}); } toast(editing ? 'Post atualizado' : 'Post criado'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
   return false;
  }, editing ? 'Salvar' : 'Criar post', extra);
 

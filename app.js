@@ -81,11 +81,11 @@ function avatar(name, sz) { sz = sz || 26; return '<span class="avt" title="' + 
    =================================================================== */
 var NAV = [
  { sec: 'Painel', admin: true, items: [{ key: 'dashboard', label: 'Visão geral', icon: 'dashboard' }, { key: 'funil', label: 'Funil 50/30/20', icon: 'target' }, { key: 'dashboards', label: 'Dashboards', icon: 'chart' }] },
- { sec: 'Editorial', items: [{ key: 'calendario', label: 'Calendário', icon: 'calendar' }, { key: 'posts', label: 'Posts', icon: 'grid' }, { key: 'minhas', label: 'Minhas demandas', icon: 'check' }] },
+ { sec: 'Editorial', items: [{ key: 'calendario', label: 'Calendário', icon: 'calendar' }, { key: 'posts', label: 'Posts', icon: 'grid' }, { key: 'minhas', label: 'Minhas demandas', icon: 'check' }, { key: 'rotinas', label: 'Rotinas', icon: 'clock' }] },
  { sec: 'Operação', items: [{ key: 'projetos', label: 'Projetos', icon: 'folder' }, { key: 'reunioes', label: 'Reuniões', icon: 'book' }] },
  { sec: 'Cadastros', items: [{ key: 'clientes', label: 'Clientes', icon: 'building' }, { key: 'usuarios', label: 'Usuários', icon: 'users' }] }
 ];
-var VIEWS = { dashboard: renderDashboard, funil: renderFunil, dashboards: renderDashboards, calendario: renderCalendario, posts: renderPosts, minhas: renderMinhas, projetos: renderProjetos, projeto: renderProjeto, reunioes: renderReunioes, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios };
+var VIEWS = { dashboard: renderDashboard, funil: renderFunil, dashboards: renderDashboards, calendario: renderCalendario, posts: renderPosts, minhas: renderMinhas, rotinas: renderRotinas, projetos: renderProjetos, projeto: renderProjeto, reunioes: renderReunioes, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios };
 var ADMIN_ROUTES = { dashboard: 1, funil: 1, dashboards: 1 };
 var route = 'calendario';
 
@@ -109,6 +109,7 @@ function renderNav() {
 function navCount(k) {
  if (k === 'posts') return st.posts.length;
  if (k === 'minhas') return st.posts.filter(function (p) { return st.user && p.responsible_id === st.user.id; }).length;
+ if (k === 'rotinas') return st.routines.filter(function (r) { return st.user && r.owner_id === st.user.id && !r.done; }).length;
  if (k === 'clientes') return st.clients.length;
  if (k === 'usuarios') return st.users.length;
  return '';
@@ -342,21 +343,54 @@ function renderPosts(el) {
  $('#bFun', el).onchange = function () { boardFunnel = this.value; renderPosts(el); };
  bindNew(el); bindBoard(el);
 }
+// Linha de demanda priorizada (mostra o prazo de CONCLUSÃO).
+function priorityRow(p) {
+ var c = postColor(p);
+ var dd = p.due_date ? 'concluir ' + fmtDay(p.due_date) : 'sem prazo';
+ return '<div class="arow" data-post="' + p.id + '"><span class="cdot c-' + c + '"></span>' +
+  '<div class="tx"><div class="t">' + esc(p.title) + '</div><div class="m">' + esc(p.client_name || 'Sem cliente') + ' · ' + typeLabel(p.post_type) + '</div></div>' +
+  '<div class="rt">' + badge(p.status, STATUS_COLOR[p.status]) + '<div class="dt">' + dd + (p.pub_time ? ' · ' + p.pub_time : '') + '</div></div></div>';
+}
+// 6 blocos por proximidade do prazo de conclusão (mais perto = mais prioritário).
+var PRIO_DEFS = [
+ { t: '🔴 Atrasadas', c: 'red' },
+ { t: 'Vence hoje', c: 'amber' },
+ { t: 'Vence amanhã', c: 'amber' },
+ { t: 'Em 2 dias', c: 'blue' },
+ { t: 'Em 3 dias', c: 'blue' },
+ { t: 'Mais pra frente / sem prazo', c: 'gray' }
+];
+function prioBucket(p, today) {
+ if (!p.due_date) return 5;
+ var d = diffDays(today, p.due_date);
+ if (d < 0) return 0; if (d === 0) return 1; if (d === 1) return 2; if (d === 2) return 3; if (d === 3) return 4;
+ return 5;
+}
 function renderMinhas(el) {
- var me = st.user || {};
+ var me = st.user || {}, today = todayISO();
  var mine = st.posts.filter(function (p) { return p.responsible_id === me.id; });
- var myR = st.routines.filter(function (r) { return r.owner_id === me.id; });
- var postsList = mine.length
-  ? mine.slice().sort(function (a, b) { return (a.pub_date || '9') < (b.pub_date || '9') ? -1 : 1; }).map(postRow).join('')
-  : '<div class="empty">Nenhum post atribuído a você.</div>';
- el.innerHTML = head('Minhas demandas', 'Seus posts e suas rotinas pessoais' + (me.name ? ' — ' + esc(me.name) : '') + '.',
+ var groups = [[], [], [], [], [], []];
+ mine.forEach(function (p) { groups[prioBucket(p, today)].push(p); });
+ groups.forEach(function (g) { g.sort(function (a, b) { return (a.due_date || '9999') < (b.due_date || '9999') ? -1 : 1; }); });
+ var blocks = PRIO_DEFS.map(function (d, i) {
+  if (!groups[i].length) return '';
+  return '<div class="prioblock"><div class="priohd"><span class="bg c-' + d.c + '"><span class="bgdot"></span>' + esc(d.t) + '</span><span class="kcnt">' + groups[i].length + '</span></div>' +
+   groups[i].map(priorityRow).join('') + '</div>';
+ }).join('') || '<div class="empty">Nenhum post atribuído a você.</div>';
+ el.innerHTML = head('Minhas demandas', 'Seus posts por prazo de conclusão — os mais próximos de vencer primeiro' + (me.name ? ' — ' + esc(me.name) : '') + '.',
   '<button class="btn pri" data-newmine="1">' + ic('plus') + ' Novo post</button>') +
-  '<div class="split2">' +
-   '<div class="panel"><div class="hd"><h3>Demandas (posts)</h3><span class="sp"></span><span class="kcnt">' + mine.length + '</span></div><div class="bd">' + postsList + '</div></div>' +
-   '<div class="panel"><div class="hd"><h3>Rotinas</h3><span class="sp"></span><button class="btn sm pri" id="newRot">' + ic('plus', 14) + ' Nova</button></div><div class="bd">' + routinesHTML(myR) + '</div></div>' +
-  '</div>';
+  '<div class="panel"><div class="bd">' + blocks + '</div></div>';
  $$('[data-newmine]', el).forEach(function (b) { b.onclick = function () { openPostModal(null, { responsible_id: me.id }); }; });
  bindPostRows(el);
+}
+function renderRotinas(el) {
+ var me = st.user || {};
+ var myR = st.routines.filter(function (r) { return r.owner_id === me.id; });
+ var pend = myR.filter(function (r) { return !r.done; }).length;
+ el.innerHTML = head('Rotinas', 'Suas tarefas de rotina (pessoais — não são posts)' + (me.name ? ' — ' + esc(me.name) : '') + '.',
+  '<button class="btn pri" id="newRot">' + ic('plus') + ' Nova rotina</button>') +
+  '<div class="kpis">' + kpi('Pendentes', pend, 'a fazer', pend ? 'amber' : 'green') + kpi('Concluídas', myR.length - pend, 'feitas', 'green') + kpi('Total', myR.length, 'no total') + '</div>' +
+  '<div class="panel"><div class="bd">' + routinesHTML(myR) + '</div></div>';
  $('#newRot', el).onclick = function () { openRoutineModal(null); };
  bindRoutines(el);
 }

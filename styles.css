@@ -338,6 +338,12 @@ button.tag.ok:hover{filter:brightness(1.1)}
 .iconbtn{border:0;background:transparent;color:var(--mut2);padding:6px;border-radius:8px;cursor:pointer;flex:0 0 auto}
 .iconbtn:hover{background:var(--panel3);color:var(--red)}
 
+/* blocos de prioridade (Minhas demandas) */
+.prioblock + .prioblock{margin-top:14px}
+.priohd{display:flex;align-items:center;justify-content:space-between;padding:4px 6px 8px;border-bottom:1px solid var(--line2);margin-bottom:4px}
+.priohd .bg{font-size:12.5px}
+.prioblock .kcnt{font-size:12px;font-weight:700;color:var(--mut)}
+
 /* ---------- CARDS (projetos) ---------- */
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:18px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:17px;box-shadow:var(--sh);cursor:pointer;transition:.14s}

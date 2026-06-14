@@ -324,3 +324,33 @@ button.tag.ok:hover{filter:brightness(1.1)}
 .pchk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2);cursor:pointer}
 .pchk input{width:16px;height:16px;accent-color:var(--yellow);flex:0 0 auto}
 @media(max-width:520px){.pchks{grid-template-columns:1fr}}
+
+/* ---------- MINHAS DEMANDAS (split) + ROTINAS ---------- */
+.split2{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+@media(max-width:900px){.split2{grid-template-columns:1fr}}
+.split2 .panel{margin-top:16px}
+.rrow{display:flex;align-items:center;gap:11px;padding:10px 8px;border-bottom:1px solid var(--line2)}
+.rrow:last-child{border-bottom:0}
+.rchk{width:18px;height:18px;accent-color:var(--green);flex:0 0 auto;cursor:pointer}
+.rrow .tx{flex:1;min-width:0;cursor:pointer}
+.rrow.done .tx .t{text-decoration:line-through;color:var(--mut)}
+.rrow.late .tx .m{color:var(--red);font-weight:600}
+.iconbtn{border:0;background:transparent;color:var(--mut2);padding:6px;border-radius:8px;cursor:pointer;flex:0 0 auto}
+.iconbtn:hover{background:var(--panel3);color:var(--red)}
+
+/* ---------- CARDS (projetos) ---------- */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:18px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:17px;box-shadow:var(--sh);cursor:pointer;transition:.14s}
+.card:hover{border-color:var(--mut2);transform:translateY(-2px);box-shadow:var(--sh-md)}
+.card .ct{width:40px;height:40px;border-radius:11px;background:var(--yellow-soft);color:var(--yellow);display:flex;align-items:center;justify-content:center;margin-bottom:11px}
+.card h4{margin:0;font-size:15.5px;font-weight:700}
+.card .m{font-size:13px;color:var(--mut);margin-top:6px;min-height:18px}
+.card .ft{display:flex;align-items:center;gap:8px;margin-top:13px;flex-wrap:wrap}
+.board3{grid-template-columns:repeat(3,minmax(220px,1fr))}
+@media(max-width:820px){.board3{grid-template-columns:repeat(3,240px)}}
+
+/* ---------- DASHBOARDS ---------- */
+.dashgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px;align-items:start}
+.dashgrid .panel{margin-top:0}
+.dashgrid .kpis{margin-top:0}
+@media(max-width:900px){.dashgrid{grid-template-columns:1fr}}

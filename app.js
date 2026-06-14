@@ -26,6 +26,8 @@ var ICONS = {
  zap:'<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
  alert:'<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
  book:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+ folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+ chart:'<line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>',
  moon:'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
  sun:'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>'
 };
@@ -62,7 +64,10 @@ var TIMES = ['12:00', '18:00'];
 function todayISO() { return String(st.serverNow || new Date().toISOString()).slice(0, 10); }
 function postColor(p) { return p && p.is_internal ? 'yellow' : 'pink'; }
 function clientById(id) { for (var i = 0; i < st.clients.length; i++) if (st.clients[i].id === id) return st.clients[i]; return null; }
-function isOverdue(p) { return p.pub_date && p.pub_date < todayISO() && p.status !== 'Postado'; }
+var OPEN_STATUS = ['Agendado', 'Em produção', 'Aguardando aprovação', 'Modificação'];
+function isOpen(p) { return OPEN_STATUS.indexOf(p.status) >= 0; }
+function isOverdue(p) { return p.due_date && p.due_date < todayISO() && p.status !== 'Postado'; }
+function diffDays(aIso, bIso) { var a = new Date(aIso + 'T00:00:00Z'), b = new Date(bIso + 'T00:00:00Z'); return Math.round((b - a) / 86400000); }
 function initials(name) { var parts = String(name || '?').trim().split(/\s+/); return ((parts[0][0] || '') + (parts[1] ? parts[1][0] : '')).toUpperCase(); }
 function fmtDay(iso) { if (!iso) return '—'; var p = iso.split('-'); return p[2] + ' ' + MON[+p[1] - 1]; }
 function fmtFull(iso) { if (!iso) return '—'; var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
@@ -75,22 +80,26 @@ function avatar(name, sz) { sz = sz || 26; return '<span class="avt" title="' + 
    ROUTER
    =================================================================== */
 var NAV = [
- { sec: 'Painel', items: [{ key: 'dashboard', label: 'Visão geral', icon: 'dashboard' }, { key: 'funil', label: 'Funil 50/30/20', icon: 'target' }] },
+ { sec: 'Painel', admin: true, items: [{ key: 'dashboard', label: 'Visão geral', icon: 'dashboard' }, { key: 'funil', label: 'Funil 50/30/20', icon: 'target' }, { key: 'dashboards', label: 'Dashboards', icon: 'chart' }] },
  { sec: 'Editorial', items: [{ key: 'calendario', label: 'Calendário', icon: 'calendar' }, { key: 'posts', label: 'Posts', icon: 'grid' }, { key: 'minhas', label: 'Minhas demandas', icon: 'check' }] },
- { sec: 'Conhecimento', items: [{ key: 'reunioes', label: 'Reuniões', icon: 'book' }] },
+ { sec: 'Operação', items: [{ key: 'projetos', label: 'Projetos', icon: 'folder' }, { key: 'reunioes', label: 'Reuniões', icon: 'book' }] },
  { sec: 'Cadastros', items: [{ key: 'clientes', label: 'Clientes', icon: 'building' }, { key: 'usuarios', label: 'Usuários', icon: 'users' }] }
 ];
-var VIEWS = { dashboard: renderDashboard, funil: renderFunil, calendario: renderCalendario, posts: renderPosts, minhas: renderMinhas, reunioes: renderReunioes, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios };
+var VIEWS = { dashboard: renderDashboard, funil: renderFunil, dashboards: renderDashboards, calendario: renderCalendario, posts: renderPosts, minhas: renderMinhas, projetos: renderProjetos, projeto: renderProjeto, reunioes: renderReunioes, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios };
+var ADMIN_ROUTES = { dashboard: 1, funil: 1, dashboards: 1 };
 var route = 'calendario';
 
-function go(v) { route = v; renderNav(); renderView(); }
+function isAdmin() { return !!(st.user && st.user.role === 'admin'); }
+function go(v) { if (ADMIN_ROUTES[v] && !isAdmin()) v = 'calendario'; route = v; renderNav(); renderView(); }
 function renderNav() {
  var h = '';
  NAV.forEach(function (g) {
+  if (g.admin && !isAdmin()) return;
   h += '<div class="navsec">' + esc(g.sec) + '</div>';
   g.items.forEach(function (it) {
+   if (it.admin && !isAdmin()) return;
    var cnt = navCount(it.key);
-   var on = route === it.key || (route === 'cliente' && it.key === 'clientes');
+   var on = route === it.key || (route === 'cliente' && it.key === 'clientes') || (route === 'projeto' && it.key === 'projetos');
    h += '<div class="navitem' + (on ? ' on' : '') + '" data-go="' + it.key + '">' + ic(it.icon, 18) + '<span>' + esc(it.label) + '</span>' + (cnt ? '<span class="cnt">' + cnt + '</span>' : '') + '</div>';
   });
  });
@@ -336,15 +345,50 @@ function renderPosts(el) {
 function renderMinhas(el) {
  var me = st.user || {};
  var mine = st.posts.filter(function (p) { return p.responsible_id === me.id; });
- var total = mine.length;
- var venc = mine.filter(isOverdue).length;
- var prox = mine.filter(function (p) { return p.pub_date && p.pub_date >= todayISO() && p.status !== 'Postado'; }).length;
- el.innerHTML = head('Minhas demandas', 'Posts em que você é o responsável' + (me.name ? ' — ' + esc(me.name) : '') + '.',
+ var myR = st.routines.filter(function (r) { return r.owner_id === me.id; });
+ var postsList = mine.length
+  ? mine.slice().sort(function (a, b) { return (a.pub_date || '9') < (b.pub_date || '9') ? -1 : 1; }).map(postRow).join('')
+  : '<div class="empty">Nenhum post atribuído a você.</div>';
+ el.innerHTML = head('Minhas demandas', 'Seus posts e suas rotinas pessoais' + (me.name ? ' — ' + esc(me.name) : '') + '.',
   '<button class="btn pri" data-newmine="1">' + ic('plus') + ' Novo post</button>') +
-  '<div class="kpis">' + kpi('Minhas', total, 'no total') + kpi('A publicar', prox, 'agendadas à frente', 'blue') + kpi('Vencidas', venc, 'data passou, não postado', venc ? 'red' : 'gray') + '</div>' +
-  (total ? '<div class="board">' + statusColumns(mine) + '</div>' : '<div class="panel"><div class="bd"><div class="empty">Você não tem demandas atribuídas a você.</div></div></div>');
+  '<div class="split2">' +
+   '<div class="panel"><div class="hd"><h3>Demandas (posts)</h3><span class="sp"></span><span class="kcnt">' + mine.length + '</span></div><div class="bd">' + postsList + '</div></div>' +
+   '<div class="panel"><div class="hd"><h3>Rotinas</h3><span class="sp"></span><button class="btn sm pri" id="newRot">' + ic('plus', 14) + ' Nova</button></div><div class="bd">' + routinesHTML(myR) + '</div></div>' +
+  '</div>';
  $$('[data-newmine]', el).forEach(function (b) { b.onclick = function () { openPostModal(null, { responsible_id: me.id }); }; });
- bindBoard(el);
+ bindPostRows(el);
+ $('#newRot', el).onclick = function () { openRoutineModal(null); };
+ bindRoutines(el);
+}
+function routinesHTML(list) {
+ if (!list.length) return '<div class="empty">Sem rotinas ainda. Clique em "Nova".</div>';
+ return list.map(function (r) {
+  return '<div class="rrow' + (r.done ? ' done' : '') + (isOverdueRoutine(r) ? ' late' : '') + '">' +
+   '<input type="checkbox" class="rchk" data-rdone="' + r.id + '"' + (r.done ? ' checked' : '') + '>' +
+   '<div class="tx" data-redit="' + r.id + '"><div class="t">' + esc(r.title) + '</div>' + (r.due_date ? '<div class="m">' + ic('clock', 12) + ' ' + fmtFull(r.due_date) + '</div>' : '') + '</div>' +
+   '<button class="iconbtn" data-rdel="' + r.id + '" title="Excluir">' + ic('trash', 14) + '</button></div>';
+ }).join('');
+}
+function isOverdueRoutine(r) { return !r.done && r.due_date && r.due_date < todayISO(); }
+function bindRoutines(el) {
+ $$('[data-rdone]', el).forEach(function (c) { c.onclick = function () { S.updateRoutine(c.getAttribute('data-rdone'), { done: c.checked }).then(function () { toast(c.checked ? 'Concluída' : 'Reaberta'); }).catch(function (e) { toast(e.message, 'err'); }); }; });
+ $$('[data-redit]', el).forEach(function (t) { t.onclick = function () { var id = t.getAttribute('data-redit'), r = null; for (var i = 0; i < st.routines.length; i++) if (st.routines[i].id === id) r = st.routines[i]; if (r) openRoutineModal(r); }; });
+ $$('[data-rdel]', el).forEach(function (b) { b.onclick = function () { if (!confirm('Excluir esta rotina?')) return; S.deleteRoutine(b.getAttribute('data-rdel')).then(function () { toast('Rotina excluída'); }).catch(function (e) { toast(e.message, 'err'); }); }; });
+}
+function openRoutineModal(rt) {
+ var r = rt || {}, editing = !!rt;
+ openModal(editing ? 'Editar rotina' : 'Nova rotina', ic('check'),
+  '<label class="fld"><span>Título</span><input id="rtTitle" value="' + esc(r.title || '') + '" placeholder="Ex.: Responder comentários do dia"></label>' +
+  '<label class="fld"><span>Prazo</span><input type="date" id="rtDue" value="' + esc(r.due_date || '') + '"></label>' +
+  '<label class="fld"><span>Notas</span><textarea id="rtNotes" rows="3" placeholder="Detalhes (opcional)">' + esc(r.notes || '') + '</textarea></label>',
+  function () {
+   var title = $('#rtTitle').value.trim(); if (!title) { toast('Informe o título', 'err'); return false; }
+   var payload = { title: title, due_date: $('#rtDue').value || null, notes: $('#rtNotes').value };
+   var op = editing ? S.updateRoutine(rt.id, payload) : S.createRoutine(payload);
+   op.then(function () { toast(editing ? 'Rotina salva' : 'Rotina criada'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
+   return false;
+  }, editing ? 'Salvar' : 'Criar rotina', editing ? '<button class="btn danger" id="rtDel">' + ic('trash', 15) + ' Excluir</button>' : '');
+ if (editing) $('#rtDel').onclick = function () { if (!confirm('Excluir esta rotina?')) return; S.deleteRoutine(rt.id).then(function () { toast('Rotina excluída'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); }); };
 }
 function postCard(p) {
  var c = postColor(p);
@@ -399,12 +443,16 @@ function openUserModal(user) {
  openModal(editing ? 'Editar usuário' : 'Novo usuário', ic('users'),
   '<label class="fld"><span>Nome</span><input id="uNome" value="' + esc(u.name || '') + '" placeholder="Nome completo"></label>' +
   '<label class="fld"><span>CPF</span><input id="uCpf" inputmode="numeric" value="' + esc(u.cpf || '') + '" placeholder="000.000.000-00"></label>' +
-  '<label class="fld"><span>Email</span><input id="uEmail" type="email" value="' + esc(u.email || '') + '" placeholder="pessoa@acttus.com.br"></label>',
+  '<label class="fld"><span>Email</span><input id="uEmail" type="email" value="' + esc(u.email || '') + '" placeholder="pessoa@acttus.com.br"></label>' +
+  '<label class="fld"><span>Telefone (com DDI — usado nos avisos de rotina no WhatsApp)</span><input id="uPhone" inputmode="numeric" value="' + esc(u.phone || '') + '" placeholder="5511999999999"></label>' +
+  (isAdmin() ? '<label class="fld"><span>Perfil</span><select id="uRole"><option value="member"' + (u.role !== 'admin' ? ' selected' : '') + '>Membro</option><option value="admin"' + (u.role === 'admin' ? ' selected' : '') + '>Admin (vê dashboards)</option></select></label>' : ''),
   function () {
    var name = $('#uNome').value.trim(), cpf = onlyDigits($('#uCpf').value), email = $('#uEmail').value.trim();
    if (!name || !cpf || !email) { toast('Preencha nome, CPF e email', 'err'); return false; }
    if (cpf.length !== 11) { toast('CPF deve ter 11 dígitos', 'err'); return false; }
-   var op = editing ? S.updateUser(user.id, { name: name, cpf: cpf, email: email }) : S.createUser({ name: name, cpf: cpf, email: email });
+   var roleEl = $('#uRole');
+   var payload = { name: name, cpf: cpf, email: email, phone: onlyDigits($('#uPhone').value), role: roleEl ? roleEl.value : (u.role || 'member') };
+   var op = editing ? S.updateUser(user.id, payload) : S.createUser(payload);
    op.then(function () { toast(editing ? 'Usuário atualizado' : 'Usuário criado'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
    return false;
   }, editing ? 'Salvar' : 'Criar usuário');
@@ -453,6 +501,139 @@ function openMeetingModal(meet) {
 }
 
 /* ===================================================================
+   PROJETOS (internos)
+   =================================================================== */
+var PT_STATUS = ['A fazer', 'Em andamento', 'Concluída'];
+var projetoId = '';
+function projStatusColor(s) { return s === 'Concluído' ? 'green' : s === 'Pausado' ? 'amber' : 'blue'; }
+function renderProjetos(el) {
+ var cards = st.projects.map(function (p) {
+  return '<div class="card" data-proj="' + p.id + '"><div class="ct">' + ic('folder', 20) + '</div>' +
+   '<h4>' + esc(p.name) + '</h4>' + (p.description ? '<div class="m">' + esc(p.description) + '</div>' : '<div class="m"></div>') +
+   '<div class="ft"><span class="bg c-' + projStatusColor(p.status) + '">' + esc(p.status) + '</span>' +
+   '<span class="sub">' + (p.done_count || 0) + '/' + (p.task_count || 0) + ' tarefas</span>' +
+   (p.responsible_name ? '<span class="sub">' + esc(p.responsible_name) + '</span>' : '') + '</div></div>';
+ }).join('') || '<div class="empty">Nenhum projeto ainda. Crie o primeiro.</div>';
+ el.innerHTML = head('Projetos', 'Projetos internos da Acttus. Clique para abrir e gerenciar as tarefas.',
+  '<button class="btn pri" id="newProj">' + ic('plus') + ' Novo projeto</button>') +
+  '<div class="cards">' + cards + '</div>';
+ $('#newProj', el).onclick = function () { openProjectModal(null); };
+ $$('[data-proj]', el).forEach(function (c) { c.onclick = function () { openProjeto(c.getAttribute('data-proj')); }; });
+}
+function openProjeto(id) { projetoId = id; route = 'projeto'; renderNav(); renderView(); var sc = document.querySelector('.scroll'); if (sc) sc.scrollTop = 0; }
+function renderProjeto(el) {
+ var p = null; for (var i = 0; i < st.projects.length; i++) if (st.projects[i].id === projetoId) p = st.projects[i];
+ if (!p) { go('projetos'); return; }
+ var tasks = st.projectTasks.filter(function (t) { return t.project_id === p.id; });
+ var cols = PT_STATUS.map(function (s) {
+  var list = tasks.filter(function (t) { return t.status === s; });
+  var color = s === 'Concluída' ? 'green' : s === 'Em andamento' ? 'blue' : 'gray';
+  var cards = list.map(function (t) {
+   return '<div class="kc" data-task="' + t.id + '"><div class="kc-t">' + esc(t.title) + '</div><div class="kc-f">' +
+    (t.due_date ? '<span class="kc-dt">' + ic('clock', 13) + ' ' + fmtFull(t.due_date) + '</span>' : '<span></span>') +
+    (t.responsible_name ? avatar(t.responsible_name, 22) : '') + '</div></div>';
+  }).join('') || '<div class="kc-empty">—</div>';
+  return '<div class="kcol"><div class="kcol-h">' + badge(s, color) + '<span class="kcnt">' + list.length + '</span></div><div class="kcol-b">' + cards + '</div></div>';
+ }).join('');
+ el.innerHTML = head(p.name, p.description || 'Projeto interno',
+  '<button class="btn" data-back="1">' + ic('left') + ' Voltar</button>' +
+  '<button class="btn" id="editProj">' + ic('edit', 15) + ' Editar</button>' +
+  '<button class="btn pri" id="newTask">' + ic('plus') + ' Nova tarefa</button>') +
+  '<div class="board board3">' + cols + '</div>';
+ $('[data-back]', el).onclick = function () { go('projetos'); };
+ $('#editProj', el).onclick = function () { openProjectModal(p); };
+ $('#newTask', el).onclick = function () { openTaskModal(null, p.id); };
+ $$('[data-task]', el).forEach(function (c) { c.onclick = function () { var id = c.getAttribute('data-task'), t = null; for (var i = 0; i < st.projectTasks.length; i++) if (st.projectTasks[i].id === id) t = st.projectTasks[i]; if (t) openTaskModal(t, p.id); }; });
+}
+function openProjectModal(proj) {
+ var p = proj || {}, editing = !!proj;
+ var userOpts = '<option value="">Sem responsável</option>' + st.users.map(function (u) { return '<option value="' + u.id + '"' + (u.id === (p.responsible_id || '') ? ' selected' : '') + '>' + esc(u.name) + '</option>'; }).join('');
+ var statusOpts = ['Ativo', 'Pausado', 'Concluído'].map(function (s) { return '<option' + (s === (p.status || 'Ativo') ? ' selected' : '') + '>' + s + '</option>'; }).join('');
+ openModal(editing ? 'Editar projeto' : 'Novo projeto', ic('folder'),
+  '<label class="fld"><span>Nome</span><input id="pjName" value="' + esc(p.name || '') + '" placeholder="Ex.: Rebranding do site"></label>' +
+  '<div class="mrow2"><label class="fld"><span>Responsável</span><select id="pjResp">' + userOpts + '</select></label>' +
+  '<label class="fld"><span>Status</span><select id="pjStatus">' + statusOpts + '</select></label></div>' +
+  '<label class="fld"><span>Descrição</span><textarea id="pjDesc" rows="3">' + esc(p.description || '') + '</textarea></label>',
+  function () {
+   var name = $('#pjName').value.trim(); if (!name) { toast('Informe o nome', 'err'); return false; }
+   var payload = { name: name, responsible_id: $('#pjResp').value || null, status: $('#pjStatus').value, description: $('#pjDesc').value };
+   var op = editing ? S.updateProject(proj.id, payload) : S.createProject(payload);
+   op.then(function (np) { toast(editing ? 'Projeto salvo' : 'Projeto criado'); closeModal(); if (!editing && np) openProjeto(np.id); }).catch(function (e) { toast(e.message, 'err'); });
+   return false;
+  }, editing ? 'Salvar' : 'Criar projeto', editing ? '<button class="btn danger" id="pjDel">' + ic('trash', 15) + ' Excluir</button>' : '');
+ if (editing) $('#pjDel').onclick = function () { if (!confirm('Excluir o projeto e todas as tarefas dele?')) return; S.deleteProject(proj.id).then(function () { toast('Projeto excluído'); closeModal(); go('projetos'); }).catch(function (e) { toast(e.message, 'err'); }); };
+}
+function openTaskModal(task, projectId) {
+ var t = task || {}, editing = !!task;
+ var userOpts = '<option value="">Sem responsável</option>' + st.users.map(function (u) { return '<option value="' + u.id + '"' + (u.id === (t.responsible_id || '') ? ' selected' : '') + '>' + esc(u.name) + '</option>'; }).join('');
+ var statusOpts = PT_STATUS.map(function (s) { return '<option' + (s === (t.status || 'A fazer') ? ' selected' : '') + '>' + s + '</option>'; }).join('');
+ openModal(editing ? 'Editar tarefa' : 'Nova tarefa', ic('check'),
+  '<label class="fld"><span>Título</span><input id="tkTitle" value="' + esc(t.title || '') + '" placeholder="O que precisa ser feito"></label>' +
+  '<div class="mrow2"><label class="fld"><span>Responsável</span><select id="tkResp">' + userOpts + '</select></label>' +
+  '<label class="fld"><span>Prazo</span><input type="date" id="tkDue" value="' + esc(t.due_date || '') + '"></label></div>' +
+  '<label class="fld"><span>Status</span><select id="tkStatus">' + statusOpts + '</select></label>' +
+  '<label class="fld"><span>Notas</span><textarea id="tkNotes" rows="3">' + esc(t.notes || '') + '</textarea></label>',
+  function () {
+   var title = $('#tkTitle').value.trim(); if (!title) { toast('Informe o título', 'err'); return false; }
+   var payload = { title: title, responsible_id: $('#tkResp').value || null, due_date: $('#tkDue').value || null, status: $('#tkStatus').value, notes: $('#tkNotes').value };
+   if (!editing) payload.project_id = projectId;
+   var op = editing ? S.updateProjectTask(task.id, payload) : S.createProjectTask(payload);
+   op.then(function () { toast(editing ? 'Tarefa salva' : 'Tarefa criada'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
+   return false;
+  }, editing ? 'Salvar' : 'Criar tarefa', editing ? '<button class="btn danger" id="tkDel">' + ic('trash', 15) + ' Excluir</button>' : '');
+ if (editing) $('#tkDel').onclick = function () { if (!confirm('Excluir esta tarefa?')) return; S.deleteProjectTask(task.id).then(function () { toast('Tarefa excluída'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); }); };
+}
+
+/* ===================================================================
+   DASHBOARDS (somente admin)
+   =================================================================== */
+function dashBars(pairs, colorOf) {
+ var max = 0; pairs.forEach(function (p) { if (p[1] > max) max = p[1]; }); max = max || 1;
+ return pairs.map(function (p) { var c = colorOf ? colorOf(p[0]) : 'yellow'; return '<div class="hb"><span class="hbl">' + esc(p[0]) + '</span><span class="hbar"><i class="c-' + c + '" style="width:' + Math.round(p[1] / max * 100) + '%"></i></span><span class="hbv">' + p[1] + '</span></div>'; }).join('') || '<div class="empty">Sem dados.</div>';
+}
+function dashPanel(title, body) { return '<div class="panel"><div class="hd"><h3>' + esc(title) + '</h3></div><div class="bd">' + body + '</div></div>'; }
+function renderDashboards(el) {
+ if (!isAdmin()) { go('calendario'); return; }
+ var posts = st.posts, today = todayISO();
+ var byResp = {}; posts.forEach(function (p) { var k = p.responsible_name || 'Sem responsável'; byResp[k] = (byResp[k] || 0) + 1; });
+ var d1 = dashBars(Object.keys(byResp).map(function (k) { return [k, byResp[k]]; }).sort(function (a, b) { return b[1] - a[1]; }));
+ var d5 = dashBars(STATUS.map(function (s) { return [s, posts.filter(function (p) { return p.status === s; }).length]; }), function (s) { return STATUS_COLOR[s]; });
+ var chanO = posts.filter(function (p) { return p.channel !== 'trafego'; }).length, chanT = posts.length - chanO;
+ var d3 = dashBars([['Orgânico', chanO], ['Tráfego', chanT]], function () { return 'blue'; });
+ var d4 = dashBars(TYPES.map(function (t) { return [t.label, posts.filter(function (p) { return p.post_type === t.key; }).length]; }), function () { return 'purple'; });
+ var venc = posts.filter(isOverdue).length;
+ var em2 = posts.filter(function (p) { return p.due_date && p.due_date >= today && diffDays(today, p.due_date) <= 2 && isOpen(p); }).length;
+ var semana = posts.filter(function (p) { return p.due_date && p.due_date >= today && diffDays(today, p.due_date) <= 7 && isOpen(p); }).length;
+ var totalP = posts.length, postados = posts.filter(function (p) { return p.status === 'Postado'; }).length;
+ var pctPub = totalP ? Math.round(postados / totalP * 100) : 0;
+ var d2 = st.clients.map(function (c) {
+  var cp = posts.filter(function (p) { return p.client_id === c.id; }); if (!cp.length) return '';
+  var pub = cp.filter(function (p) { return p.status === 'Postado'; }).length, ov = cp.filter(isOverdue).length;
+  return '<tr><td class="cn"><span class="cdot c-' + (c.is_internal ? 'yellow' : 'pink') + '"></span>' + esc(c.name) + '</td><td>' + cp.length + '</td><td>' + pub + '</td><td>' + (ov ? '<span class="c-red">' + ov + '</span>' : '0') + '</td></tr>';
+ }).join('') || '<tr><td colspan="4" class="empty">Sem dados.</td></tr>';
+ var d9 = st.projects.map(function (p) { return '<tr><td>' + esc(p.name) + '</td><td>' + esc(p.status) + '</td><td>' + (p.done_count || 0) + '/' + (p.task_count || 0) + '</td></tr>'; }).join('') || '<tr><td colspan="3" class="empty">Sem projetos.</td></tr>';
+
+ el.innerHTML = head('Dashboards', 'Visão analítica da operação (acesso de admin).', '') +
+  '<div class="dashgrid">' +
+   dashPanel('Produção por responsável', d1) +
+   dashPanel('Pipeline de status', d5) +
+   dashPanel('Orgânico × Tráfego', d3) +
+   dashPanel('Tipos de conteúdo', d4) +
+   dashPanel('Pontualidade / Atrasos', '<div class="kpis">' + kpi('Vencidos', venc, 'a concluir, atrasados', venc ? 'red' : 'gray') + kpi('≤ 2 dias', em2, 'do prazo de conclusão', 'amber') + kpi('Nesta semana', semana, 'a concluir em 7 dias', 'blue') + '</div>') +
+   dashPanel('Publicação', '<div class="kpis">' + kpi('Publicados', postados, 'status Postado', 'green') + kpi('Faltam', totalP - postados, 'ainda não postados', 'amber') + kpi('% publicado', pctPub + '%', 'do total', 'yellow') + '</div>') +
+   dashPanel('Desempenho por cliente', '<table class="tbl"><thead><tr><th>Cliente</th><th>Posts</th><th>Postados</th><th>Vencidos</th></tr></thead><tbody>' + d2 + '</tbody></table>') +
+   '<div class="panel"><div class="hd"><h3>Rotinas por usuário</h3></div><div class="bd" id="dashRoutines"><div class="empty">Carregando…</div></div></div>' +
+   dashPanel('Projetos', '<table class="tbl"><thead><tr><th>Projeto</th><th>Status</th><th>Tarefas</th></tr></thead><tbody>' + d9 + '</tbody></table>') +
+  '</div>';
+ S.allRoutines().then(function (rs) {
+  var elp = $('#dashRoutines'); if (!elp) return;
+  var byU = {}; rs.forEach(function (r) { var k = r.owner_name || '—'; (byU[k] = byU[k] || { pend: 0, done: 0 })[r.done ? 'done' : 'pend']++; });
+  var rows = Object.keys(byU).map(function (k) { return '<tr><td>' + esc(k) + '</td><td>' + byU[k].pend + '</td><td>' + byU[k].done + '</td></tr>'; }).join('') || '<tr><td colspan="3" class="empty">Sem rotinas.</td></tr>';
+  elp.innerHTML = '<table class="tbl"><thead><tr><th>Usuário</th><th>Pendentes</th><th>Concluídas</th></tr></thead><tbody>' + rows + '</tbody></table>';
+ }).catch(function () { var elp = $('#dashRoutines'); if (elp) elp.innerHTML = '<div class="empty">Não foi possível carregar.</div>'; });
+}
+
+/* ===================================================================
    MODAL DE POST (criar/editar)
    =================================================================== */
 function bindNew(el) { $$('[data-new]', el).forEach(function (b) { b.onclick = function () { openPostModal(null); }; }); }
@@ -486,8 +667,9 @@ function openPostModal(post, defaults) {
   '<div class="fld"><span>Etapa do funil</span>' + seg('funnel_stage', FUNNEL.map(function (f) { return { key: f.key, label: f.short }; }), cur.funnel_stage) + '</div>' +
   '<div class="mrow2"><div class="fld"><span>Tipo</span>' + seg('post_type', TYPES, cur.post_type) + '</div>' +
   '<div class="fld"><span>Canal</span>' + seg('channel', CHANNELS, cur.channel) + '</div></div>' +
-  '<div class="mrow3"><label class="fld"><span>Data</span><input type="date" id="pDate" value="' + esc(p.pub_date || d.pub_date || '') + '"></label>' +
-  '<label class="fld"><span>Horário</span><select id="pTime">' + timeOpts + '</select></label>' +
+  '<div class="mrow2"><label class="fld"><span>Data de publicação</span><input type="date" id="pDate" value="' + esc(p.pub_date || d.pub_date || '') + '"></label>' +
+  '<label class="fld"><span>Prazo de conclusão</span><input type="date" id="pDue" value="' + esc(p.due_date || '') + '"></label></div>' +
+  '<div class="mrow2"><label class="fld"><span>Horário</span><select id="pTime">' + timeOpts + '</select></label>' +
   '<label class="fld"><span>Status</span><select id="pStatus">' + statusOpts + '</select></label></div>' +
   '<label class="fld"><span>Observações</span><textarea id="pNotes" rows="3" placeholder="Briefing, links, referências...">' + esc(p.notes || '') + '</textarea></label>';
 
@@ -498,7 +680,7 @@ function openPostModal(post, defaults) {
    client_id: $('#pClient').value || null,
    responsible_id: $('#pResp').value || null,
    funnel_stage: cur.funnel_stage, post_type: cur.post_type, channel: cur.channel,
-   status: $('#pStatus').value, pub_date: $('#pDate').value || null, pub_time: $('#pTime').value || null,
+   status: $('#pStatus').value, pub_date: $('#pDate').value || null, due_date: $('#pDue').value || null, pub_time: $('#pTime').value || null,
    notes: $('#pNotes').value
   };
   if (!payload.title) { toast('Informe o título', 'err'); return false; }

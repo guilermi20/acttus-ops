@@ -13,8 +13,9 @@ export default async function handler(req, res) {
 
   const out = { posts: 0, routineDMs: 0 };
   try {
-    // posts cujo PRAZO DE CONCLUSÃO já chegou (vencidos ou hoje) e ainda em aberto
+    // posts cujo PRAZO DE CONCLUSÃO já chegou (atrasados ou hoje) e ainda em aberto
     const p = await sql(`select p.title, to_char(p.due_date,'DD/MM') as due, p.status,
+        (p.due_date < current_date) as is_late,
         c.name as client, u.name as resp
       from posts p
       left join clients c on c.id = p.client_id
@@ -22,12 +23,18 @@ export default async function handler(req, res) {
       where p.due_date is not null and p.due_date <= current_date and p.status = any($1)
       order by p.due_date asc limit 80`, [OPEN]);
     if (p.rows.length) {
-      const lines = p.rows.map((r) => '• *' + r.title + '* — ' + (r.client || 'sem cliente') +
-        ' — concluir até ' + r.due + ' — _' + r.status + '_' + (r.resp ? ' (' + r.resp + ')' : ''));
-      await sendGroup('⏰ *Acttus OS — tarefas a concluir (vencidas/hoje) — ' + p.rows.length + '*\n\n' + lines.join('\n'));
+      const late = p.rows.filter((r) => r.is_late);
+      const today = p.rows.filter((r) => !r.is_late);
+      const lineLate = (r) => '• *' + r.title + '* — ' + (r.client || 'sem cliente') + ' — venceu ' + r.due + ' — _' + r.status + '_' + (r.resp ? ' · ' + r.resp : '');
+      const lineToday = (r) => '• *' + r.title + '* — ' + (r.client || 'sem cliente') + ' — _' + r.status + '_' + (r.resp ? ' · ' + r.resp : '');
+      const blocks = ['⏰ *Acttus OS — tarefas a concluir*'];
+      if (late.length) blocks.push('🔴 *Atrasados (' + late.length + ')*\n' + late.map(lineLate).join('\n'));
+      if (today.length) blocks.push('🟡 *Para hoje (' + today.length + ')*\n' + today.map(lineToday).join('\n'));
+      await sendGroup(blocks.join('\n\n'));
       out.posts = p.rows.length;
+      out.late = late.length; out.today = today.length;
       await sql('insert into notifications (text, kind, whatsapp_sent) values ($1,$2,$3)',
-        [p.rows.length + ' tarefa(s) a concluir avisada(s) no grupo', 'due', true]);
+        [late.length + ' atrasada(s) e ' + today.length + ' para hoje avisada(s) no grupo', 'due', true]);
     }
 
     // rotinas vencidas → DM no privado do dono (agrupadas por telefone)

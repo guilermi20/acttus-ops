@@ -322,6 +322,7 @@ button.tag.ok:hover{filter:brightness(1.1)}
 .mtcard-meta .i{color:var(--mut2)}
 .mtcard-notes{font-size:13px;color:var(--ink2);margin-top:10px;line-height:1.5;white-space:pre-wrap;max-height:120px;overflow:hidden}
 .mtcard-notes.empty-notes{color:var(--mut2);font-style:italic}
+.ata{white-space:pre-wrap;line-height:1.7;font-size:15px;color:var(--ink2);max-width:780px}
 .pchks{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:11px 13px;max-height:160px;overflow:auto}
 .pchk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2);cursor:pointer}
 .pchk input{width:16px;height:16px;accent-color:var(--yellow);flex:0 0 auto}

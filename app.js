@@ -86,7 +86,7 @@ var NAV = [
  { sec: 'Operação', items: [{ key: 'projetos', label: 'Projetos', icon: 'folder' }, { key: 'reunioes', label: 'Reuniões', icon: 'book' }] },
  { sec: 'Cadastros', items: [{ key: 'clientes', label: 'Clientes', icon: 'building' }, { key: 'usuarios', label: 'Usuários', icon: 'users' }] }
 ];
-var VIEWS = { dashboard: renderDashboard, funil: renderFunil, dashboards: renderDashboards, calendario: renderCalendario, posts: renderPosts, minhas: renderMinhas, rotinas: renderRotinas, ideias: renderIdeias, projetos: renderProjetos, projeto: renderProjeto, reunioes: renderReunioes, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios };
+var VIEWS = { dashboard: renderDashboard, funil: renderFunil, dashboards: renderDashboards, calendario: renderCalendario, posts: renderPosts, minhas: renderMinhas, rotinas: renderRotinas, ideias: renderIdeias, projetos: renderProjetos, projeto: renderProjeto, reunioes: renderReunioes, reuniao: renderReuniao, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios };
 var ADMIN_ROUTES = { dashboard: 1, funil: 1, dashboards: 1 };
 var route = 'calendario';
 
@@ -100,7 +100,7 @@ function renderNav() {
   g.items.forEach(function (it) {
    if (it.admin && !isAdmin()) return;
    var cnt = navCount(it.key);
-   var on = route === it.key || (route === 'cliente' && it.key === 'clientes') || (route === 'projeto' && it.key === 'projetos');
+   var on = route === it.key || (route === 'cliente' && it.key === 'clientes') || (route === 'projeto' && it.key === 'projetos') || (route === 'reuniao' && it.key === 'reunioes');
    h += '<div class="navitem' + (on ? ' on' : '') + '" data-go="' + it.key + '">' + ic(it.icon, 18) + '<span>' + esc(it.label) + '</span>' + (cnt ? '<span class="cnt">' + cnt + '</span>' : '') + '</div>';
   });
  });
@@ -583,7 +583,22 @@ function renderReunioes(el) {
   '<button class="btn pri" id="newMeet">' + ic('plus') + ' Nova pauta</button>') +
   '<div class="mtgrid">' + cards + '</div>';
  $('#newMeet', el).onclick = function () { openMeetingModal(null); };
- $$('[data-meet]', el).forEach(function (c) { c.onclick = function () { var id = c.getAttribute('data-meet'), m = null; for (var i = 0; i < st.meetings.length; i++) if (st.meetings[i].id === id) m = st.meetings[i]; if (m) openMeetingModal(m); }; });
+ $$('[data-meet]', el).forEach(function (c) { c.onclick = function () { openReuniao(c.getAttribute('data-meet')); }; });
+}
+var reuniaoId = '';
+function openReuniao(id) { reuniaoId = id; route = 'reuniao'; renderNav(); renderView(); var sc = document.querySelector('.scroll'); if (sc) sc.scrollTop = 0; }
+function renderReuniao(el) {
+ var m = null; for (var i = 0; i < st.meetings.length; i++) if (st.meetings[i].id === reuniaoId) m = st.meetings[i];
+ if (!m) { go('reunioes'); return; }
+ var parts = (m.participants || []).map(function (id) { var u = userById(id); return u ? u.name : null; }).filter(Boolean);
+ var sub = (m.meeting_date ? fmtFull(m.meeting_date) : 'sem data') + (m.category ? ' · ' + esc(m.category) : '');
+ el.innerHTML = head(m.title, sub,
+  '<button class="btn" data-back="1">' + ic('left') + ' Reuniões</button>' +
+  '<button class="btn" id="mtEdit">' + ic('edit', 15) + ' Editar</button>') +
+  (parts.length ? '<div class="note">' + ic('users', 15) + ' <span>Participantes: <b>' + esc(parts.join(', ')) + '</b></span></div>' : '') +
+  '<div class="panel"><div class="hd"><h3>Pauta / anotações</h3></div><div class="bd"><div class="ata">' + (m.notes ? esc(m.notes) : '<span class="empty">Sem anotações ainda. Clique em Editar para escrever a pauta.</span>') + '</div></div></div>';
+ $('[data-back]', el).onclick = function () { go('reunioes'); };
+ $('#mtEdit', el).onclick = function () { openMeetingModal(m); };
 }
 function openMeetingModal(meet) {
  var m = meet || {}, editing = !!meet, sel = m.participants || [];

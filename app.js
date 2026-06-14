@@ -492,20 +492,45 @@ function renderClientes(el) {
  $$('[data-cliedit]', el).forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); var c = clientById(b.getAttribute('data-cliedit')); if (c) openClientModal(c); }; });
  $$('[data-clilink]', el).forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); copyPanelLink(b.getAttribute('data-clilink')); }; });
 }
+// Upload de arquivo direto para o Vercel Blob → retorna a URL.
+function uploadBlob(file) {
+ return import('https://esm.sh/@vercel/blob@2.4.0/client').then(function (mod) {
+  return mod.upload('uploads/' + Date.now() + '-' + file.name.replace(/[^\w.\-]+/g, '_'), file, { access: 'public', handleUploadUrl: '/api/posts?action=upload', clientPayload: st.token });
+ }).then(function (blob) { return blob.url; });
+}
+// Widget de imagem com preview + enviar/trocar/remover.
+function imgUploader(box, getUrl, setUrl) {
+ function paint() {
+  var u = getUrl();
+  box.innerHTML = (u ? '<span class="imgup-prev" style="background-image:url(' + JSON.stringify(u) + ')"></span>' : '<span class="imgup-prev ph">' + ic('plus', 16) + '</span>') +
+   '<label class="btn sm">' + (u ? 'Trocar' : 'Enviar imagem') + '<input type="file" accept="image/*" hidden></label>' +
+   (u ? '<button type="button" class="iconbtn" data-rm="1" title="Remover">' + ic('x', 14) + '</button>' : '');
+  box.querySelector('input[type=file]').onchange = function () {
+   var f = this.files && this.files[0]; if (!f) return; this.value = '';
+   toast('Enviando imagem…');
+   uploadBlob(f).then(function (url) { setUrl(url); paint(); toast('Imagem enviada'); }).catch(function (e) { toast('Falha: ' + (e.message || e), 'err'); });
+  };
+  var rm = box.querySelector('[data-rm]'); if (rm) rm.onclick = function () { setUrl(''); paint(); };
+ }
+ paint();
+}
 function openClientModal(cli) {
  var c = cli || {}, editing = !!cli;
+ var avatarUrl = c.avatar_url || '', coverUrl = c.cover_url || '';
  openModal(editing ? 'Editar cliente' : 'Novo cliente', ic('building'),
   '<label class="fld"><span>Nome do cliente</span><input id="cNome" value="' + esc(c.name || '') + '" placeholder="Ex.: Escritório Silva"></label>' +
   '<label class="chk"><input type="checkbox" id="cInt"' + (c.is_internal ? ' checked' : '') + '> É interno (Acttus) — aparece em amarelo</label>' +
-  '<label class="fld"><span>URL da foto de perfil</span><input id="cAvatar" value="' + esc(c.avatar_url || '') + '" placeholder="https://…/logo.png"></label>' +
-  '<label class="fld"><span>URL da capa</span><input id="cCover" value="' + esc(c.cover_url || '') + '" placeholder="https://…/capa.jpg"></label>',
+  '<div class="fld"><span>Foto de perfil</span><div class="imgup" id="avUp"></div></div>' +
+  '<div class="fld"><span>Capa</span><div class="imgup" id="cvUp"></div></div>',
   function () {
    var name = $('#cNome').value.trim(); if (!name) { toast('Informe o nome', 'err'); return false; }
-   var payload = { name: name, is_internal: $('#cInt').checked, avatar_url: $('#cAvatar').value.trim() || null, cover_url: $('#cCover').value.trim() || null };
+   var payload = { name: name, is_internal: $('#cInt').checked, avatar_url: avatarUrl || null, cover_url: coverUrl || null };
    var op = editing ? S.updateClient(cli.id, payload) : S.createClient(payload);
    op.then(function () { toast(editing ? 'Cliente salvo' : 'Cliente criado'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
    return false;
   }, editing ? 'Salvar' : 'Criar cliente');
+ imgUploader($('#avUp'), function () { return avatarUrl; }, function (u) { avatarUrl = u; });
+ imgUploader($('#cvUp'), function () { return coverUrl; }, function (u) { coverUrl = u; });
 }
 
 /* ===================================================================
@@ -833,11 +858,7 @@ function openPostModal(post, defaults) {
   var f = this.files && this.files[0]; if (!f) return;
   this.value = '';
   toast('Enviando anexo…');
-  import('https://esm.sh/@vercel/blob@2.4.0/client').then(function (mod) {
-   return mod.upload('posts/' + Date.now() + '-' + f.name.replace(/[^\w.\-]+/g, '_'), f, { access: 'public', handleUploadUrl: '/api/posts?action=upload', clientPayload: st.token });
-  }).then(function (blob) {
-   media.push({ url: blob.url, type: f.type, name: f.name }); renderAtt(); toast('Anexo adicionado');
-  }).catch(function (e) { toast('Falha no upload: ' + (e.message || e), 'err'); });
+  uploadBlob(f).then(function (url) { media.push({ url: url, type: f.type, name: f.name }); renderAtt(); toast('Anexo adicionado'); }).catch(function (e) { toast('Falha no upload: ' + (e.message || e), 'err'); });
  };
  if (editing) $('#pDel').onclick = function () {
   if (!confirm('Excluir este post?')) return;

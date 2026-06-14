@@ -87,6 +87,12 @@
   }
 
   function closeModal() { $('#modal').classList.remove('show'); $('#mboxc').innerHTML = ''; }
+  function openZoom(src) {
+    var lb = document.getElementById('lightbox');
+    if (!lb) { lb = document.createElement('div'); lb.id = 'lightbox'; lb.className = 'lightbox'; lb.onclick = function () { lb.classList.remove('show'); lb.innerHTML = ''; }; document.body.appendChild(lb); }
+    lb.innerHTML = '<img src="' + esc(src) + '" alt=""><button class="lb-x" type="button" aria-label="Fechar">✕</button>';
+    lb.classList.add('show');
+  }
   function openDetail(post) {
     var pend = post.status === 'Aguardando aprovação';
     $('#mboxc').innerHTML =
@@ -98,6 +104,7 @@
         : '<div class="mft"><span></span><div class="mft-r"><button type="button" class="btn" id="btnCancel">Fechar</button></div></div>');
     $('#modal').classList.add('show');
     $('#mx').onclick = closeModal; $('#btnCancel').onclick = closeModal; $('#modalBg').onclick = closeModal;
+    $$('#mboxc img.pp-media').forEach(function (img) { img.classList.add('zoomable'); img.onclick = function () { openZoom(img.src); }; });
     if (pend) {
       $('#btnApprove').onclick = function () { act('approve', post.id); };
       $('#btnReject').onclick = function () {

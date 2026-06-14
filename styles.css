@@ -411,6 +411,12 @@ button.tag.ok:hover{filter:brightness(1.1)}
 .pp-medias{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-top:11px}
 .pp-media{width:100%;border-radius:9px;max-height:260px;object-fit:cover;background:var(--panel2);border:1px solid var(--line2);display:block}
 .pp-cap{font-size:13px;color:var(--ink2);margin-top:9px;white-space:pre-wrap;line-height:1.5}
+img.pp-media.zoomable{cursor:zoom-in}
+.lightbox{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;padding:24px;cursor:zoom-out}
+.lightbox.show{display:flex}
+.lightbox img{max-width:96vw;max-height:92vh;object-fit:contain;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.lightbox .lb-x{position:fixed;top:16px;right:20px;background:rgba(255,255,255,.16);color:#fff;border:0;width:42px;height:42px;border-radius:50%;font-size:18px;cursor:pointer}
+.lightbox .lb-x:hover{background:rgba(255,255,255,.3)}
 
 /* anexos no modal de post */
 .att-list{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}

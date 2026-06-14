@@ -7,7 +7,7 @@
   var state = {
     token: localStorage.getItem(TOKEN_KEY) || null,
     user: null,
-    clients: [], users: [], posts: [], notifications: [],
+    clients: [], users: [], posts: [], notifications: [], meetings: [],
     serverNow: null, sig: '', loaded: false
   };
   try { state.user = JSON.parse(localStorage.getItem(USER_KEY) || 'null'); } catch (e) {}
@@ -56,13 +56,15 @@
       req('GET', '/api/clients'),
       req('GET', '/api/users'),
       req('GET', '/api/posts'),
-      req('GET', '/api/notifications')
+      req('GET', '/api/notifications'),
+      req('GET', '/api/meetings')
     ]);
     state.clients = r[0] || [];
     state.users = r[1] || [];
     state.posts = (r[2] && r[2].posts) || [];
     state.serverNow = r[2] && r[2].now;
     state.notifications = r[3] || [];
+    state.meetings = r[4] || [];
     state.sig = sigOf(state.posts);
     state.loaded = true;
     emit();
@@ -95,6 +97,9 @@
   function createUser(b) { return req('POST', '/api/users', b).then(function (u) { state.users.push(u); state.users.sort(function (a, b) { return a.name.localeCompare(b.name); }); emit(); return u; }); }
   function updateUser(id, b) { return req('PATCH', '/api/users?id=' + encodeURIComponent(id), b).then(function (u) { var i = -1; for (var k = 0; k < state.users.length; k++) if (state.users[k].id === id) { i = k; break; } if (i >= 0) state.users[i] = u; state.users.sort(function (a, b) { return a.name.localeCompare(b.name); }); if (state.user && state.user.id === id) { state.user = { id: u.id, name: u.name, email: u.email }; localStorage.setItem(USER_KEY, JSON.stringify(state.user)); } emit(); return u; }); }
   function markNotifsRead() { return req('PATCH', '/api/notifications').then(function () { var now = new Date().toISOString(); state.notifications.forEach(function (n) { if (!n.read_at) n.read_at = now; }); emit(); }); }
+  function createMeeting(b) { return req('POST', '/api/meetings', b).then(function (m) { state.meetings.unshift(m); emit(); return m; }); }
+  function updateMeeting(id, b) { return req('PATCH', '/api/meetings?id=' + encodeURIComponent(id), b).then(function (m) { var i = -1; for (var k = 0; k < state.meetings.length; k++) if (state.meetings[k].id === id) { i = k; break; } if (i >= 0) state.meetings[i] = m; else state.meetings.unshift(m); emit(); return m; }); }
+  function deleteMeeting(id) { return req('DELETE', '/api/meetings?id=' + encodeURIComponent(id)).then(function () { state.meetings = state.meetings.filter(function (m) { return m.id !== id; }); emit(); }); }
 
   var pollTimer = null;
   function startPolling() {
@@ -110,6 +115,7 @@
     loadAll: loadAll, refreshPosts: refreshPosts, refreshNotifs: refreshNotifs,
     createPost: createPost, updatePost: updatePost, deletePost: deletePost,
     createClient: createClient, createUser: createUser, updateUser: updateUser, markNotifsRead: markNotifsRead,
+    createMeeting: createMeeting, updateMeeting: updateMeeting, deleteMeeting: deleteMeeting,
     startPolling: startPolling, stopPolling: stopPolling,
     isAuthed: function () { return !!state.token; }
   };

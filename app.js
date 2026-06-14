@@ -25,6 +25,7 @@ var ICONS = {
  edit:'<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/>',
  zap:'<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
  alert:'<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+ book:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
  moon:'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
  sun:'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>'
 };
@@ -64,6 +65,8 @@ function clientById(id) { for (var i = 0; i < st.clients.length; i++) if (st.cli
 function isOverdue(p) { return p.pub_date && p.pub_date < todayISO() && p.status !== 'Postado'; }
 function initials(name) { var parts = String(name || '?').trim().split(/\s+/); return ((parts[0][0] || '') + (parts[1] ? parts[1][0] : '')).toUpperCase(); }
 function fmtDay(iso) { if (!iso) return '—'; var p = iso.split('-'); return p[2] + ' ' + MON[+p[1] - 1]; }
+function fmtFull(iso) { if (!iso) return '—'; var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+function userById(id) { for (var i = 0; i < st.users.length; i++) if (st.users[i].id === id) return st.users[i]; return null; }
 
 function badge(text, color) { return '<span class="bg c-' + color + '"><span class="bgdot"></span>' + esc(text) + '</span>'; }
 function avatar(name, sz) { sz = sz || 26; return '<span class="avt" title="' + esc(name || '—') + '" style="width:' + sz + 'px;height:' + sz + 'px;font-size:' + (sz * .4).toFixed(0) + 'px">' + esc(initials(name)) + '</span>'; }
@@ -74,9 +77,10 @@ function avatar(name, sz) { sz = sz || 26; return '<span class="avt" title="' + 
 var NAV = [
  { sec: 'Painel', items: [{ key: 'dashboard', label: 'Visão geral', icon: 'dashboard' }, { key: 'funil', label: 'Funil 50/30/20', icon: 'target' }] },
  { sec: 'Editorial', items: [{ key: 'calendario', label: 'Calendário', icon: 'calendar' }, { key: 'posts', label: 'Posts', icon: 'grid' }, { key: 'minhas', label: 'Minhas demandas', icon: 'check' }] },
+ { sec: 'Conhecimento', items: [{ key: 'reunioes', label: 'Reuniões', icon: 'book' }] },
  { sec: 'Cadastros', items: [{ key: 'clientes', label: 'Clientes', icon: 'building' }, { key: 'usuarios', label: 'Usuários', icon: 'users' }] }
 ];
-var VIEWS = { dashboard: renderDashboard, funil: renderFunil, calendario: renderCalendario, posts: renderPosts, minhas: renderMinhas, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios };
+var VIEWS = { dashboard: renderDashboard, funil: renderFunil, calendario: renderCalendario, posts: renderPosts, minhas: renderMinhas, reunioes: renderReunioes, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios };
 var route = 'calendario';
 
 function go(v) { route = v; renderNav(); renderView(); }
@@ -404,6 +408,48 @@ function openUserModal(user) {
    op.then(function () { toast(editing ? 'Usuário atualizado' : 'Usuário criado'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
    return false;
   }, editing ? 'Salvar' : 'Criar usuário');
+}
+
+/* ===================================================================
+   REUNIÕES (anotações estilo Notion)
+   =================================================================== */
+function renderReunioes(el) {
+ var cards = st.meetings.map(function (m) {
+  var parts = (m.participants || []).map(function (id) { var u = userById(id); return u ? u.name : null; }).filter(Boolean);
+  return '<div class="mtcard" data-meet="' + m.id + '">' +
+   '<div class="mtcard-h"><h4>' + esc(m.title) + '</h4>' + (m.category ? '<span class="bg c-blue">' + esc(m.category) + '</span>' : '') + '</div>' +
+   '<div class="mtcard-meta">' + ic('calendar', 14) + ' ' + (m.meeting_date ? fmtFull(m.meeting_date) : 'sem data') + (parts.length ? ' &nbsp;·&nbsp; ' + ic('users', 14) + ' ' + esc(parts.join(', ')) : '') + '</div>' +
+   '<div class="mtcard-notes' + (m.notes ? '' : ' empty-notes') + '">' + (m.notes ? esc(m.notes.slice(0, 240)) + (m.notes.length > 240 ? '…' : '') : 'Sem anotações ainda.') + '</div>' +
+   '</div>';
+ }).join('') || '<div class="empty">Nenhuma reunião registrada. Clique em "Nova pauta" para começar.</div>';
+ el.innerHTML = head('Reuniões', 'Anotações de pautas e assuntos discutidos — simples como um bloco de notas.',
+  '<button class="btn pri" id="newMeet">' + ic('plus') + ' Nova pauta</button>') +
+  '<div class="mtgrid">' + cards + '</div>';
+ $('#newMeet', el).onclick = function () { openMeetingModal(null); };
+ $$('[data-meet]', el).forEach(function (c) { c.onclick = function () { var id = c.getAttribute('data-meet'), m = null; for (var i = 0; i < st.meetings.length; i++) if (st.meetings[i].id === id) m = st.meetings[i]; if (m) openMeetingModal(m); }; });
+}
+function openMeetingModal(meet) {
+ var m = meet || {}, editing = !!meet, sel = m.participants || [];
+ var partChecks = st.users.length ? st.users.map(function (u) {
+  return '<label class="pchk"><input type="checkbox" value="' + u.id + '"' + (sel.indexOf(u.id) >= 0 ? ' checked' : '') + '> ' + esc(u.name) + '</label>';
+ }).join('') : '<div class="sub">Nenhum usuário cadastrado ainda.</div>';
+ var body =
+  '<label class="fld"><span>Título</span><input id="mtTitle" value="' + esc(m.title || '') + '" placeholder="Ex.: Planejamento de conteúdo — julho"></label>' +
+  '<div class="mrow2"><label class="fld"><span>Data</span><input type="date" id="mtDate" value="' + esc(m.meeting_date || '') + '"></label>' +
+  '<label class="fld"><span>Categoria</span><input id="mtCat" value="' + esc(m.category || '') + '" placeholder="Ex.: Planejamento, Cliente, Interna"></label></div>' +
+  '<div class="fld"><span>Participantes</span><div class="pchks">' + partChecks + '</div></div>' +
+  '<label class="fld"><span>Pauta / anotações</span><textarea id="mtNotes" rows="9" placeholder="Assuntos discutidos, decisões, próximos passos...">' + esc(m.notes || '') + '</textarea></label>';
+ var extra = editing ? '<button class="btn danger" id="mtDel">' + ic('trash', 15) + ' Excluir</button>' : '';
+ openModal(editing ? 'Editar pauta' : 'Nova pauta', ic('book'), body, function () {
+  var title = $('#mtTitle').value.trim();
+  if (!title) { toast('Informe o título', 'err'); return false; }
+  var parts = $$('#mboxc .pchks input:checked').map(function (i) { return i.value; });
+  var payload = { title: title, meeting_date: $('#mtDate').value || null, category: $('#mtCat').value.trim(), participants: parts, notes: $('#mtNotes').value };
+  var op = editing ? S.updateMeeting(meet.id, payload) : S.createMeeting(payload);
+  op.then(function () { toast(editing ? 'Pauta salva' : 'Pauta criada'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
+  return false;
+ }, editing ? 'Salvar' : 'Criar pauta', extra);
+ if (editing) $('#mtDel').onclick = function () { if (!confirm('Excluir esta pauta?')) return; S.deleteMeeting(meet.id).then(function () { toast('Pauta excluída'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); }); };
 }
 
 /* ===================================================================

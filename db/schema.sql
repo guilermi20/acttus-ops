@@ -46,5 +46,17 @@ create table if not exists notifications (
   whatsapp_sent boolean not null default false
 );
 
--- Observação: updated_at é setado explicitamente no UPDATE (api/posts.js),
+-- Reuniões (anotações estilo Notion: título, data, participantes, categoria, pauta)
+create table if not exists meetings (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  meeting_date date,
+  category text not null default '',
+  participants jsonb not null default '[]',
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Observação: updated_at é setado explicitamente no UPDATE (api/*.js),
 -- evitando trigger/plpgsql para o schema poder ser aplicado statement-a-statement.

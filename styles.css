@@ -309,3 +309,18 @@ body.light .sb-scroll::-webkit-scrollbar-thumb{background:#E0D8C8}
 button.tag{border:0;cursor:pointer;display:inline-flex;align-items:center;gap:3px;font-family:inherit}
 button.tag.off:hover{background:var(--amber);color:var(--yellow-ink)}
 button.tag.ok:hover{filter:brightness(1.1)}
+
+/* ---------- REUNIÕES ---------- */
+.mtgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-top:18px}
+.mtcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 17px;box-shadow:var(--sh);cursor:pointer;transition:.14s}
+.mtcard:hover{border-color:var(--mut2);transform:translateY(-2px);box-shadow:var(--sh-md)}
+.mtcard-h{display:flex;align-items:flex-start;gap:8px;justify-content:space-between}
+.mtcard-h h4{margin:0;font-size:15.5px;font-weight:700;letter-spacing:-.2px}
+.mtcard-meta{display:flex;align-items:center;gap:4px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:8px}
+.mtcard-meta .i{color:var(--mut2)}
+.mtcard-notes{font-size:13px;color:var(--ink2);margin-top:10px;line-height:1.5;white-space:pre-wrap;max-height:120px;overflow:hidden}
+.mtcard-notes.empty-notes{color:var(--mut2);font-style:italic}
+.pchks{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:11px 13px;max-height:160px;overflow:auto}
+.pchk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2);cursor:pointer}
+.pchk input{width:16px;height:16px;accent-color:var(--yellow);flex:0 0 auto}
+@media(max-width:520px){.pchks{grid-template-columns:1fr}}

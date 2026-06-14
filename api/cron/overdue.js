@@ -1,46 +1,49 @@
 import { sql } from '../../lib/db.js';
-import { sendText } from '../../lib/whatsapp.js';
+import { sendGroup, sendDM } from '../../lib/whatsapp.js';
 
-function fmtDate(d) {
-  const x = new Date(d);
-  return String(x.getUTCDate()).padStart(2, '0') + '/' + String(x.getUTCMonth() + 1).padStart(2, '0');
-}
+// "Em aberto" = do status Modificação para trás no funil de produção.
+const OPEN = ['Agendado', 'Em produção', 'Aguardando aprovação', 'Modificação'];
 
-// Chamado pelo Vercel Cron (1x/dia). Também aceita ?secret= para teste manual.
+// 08:00 America/Sao_Paulo (= 11:00 UTC). Posts a concluir → grupo; rotinas vencidas → DM do dono.
 export default async function handler(req, res) {
   const secret = process.env.CRON_SECRET;
   const auth = (req.headers['authorization'] || '').replace('Bearer ', '');
   const provided = auth || (req.query && req.query.secret);
   if (secret && provided !== secret) return res.status(401).json({ error: 'unauthorized' });
 
+  const out = { posts: 0, routineDMs: 0 };
   try {
-    const { rows } = await sql`
-      select p.title, p.pub_date, p.pub_time, p.status,
-             c.name as client_name, u.name as resp
+    // posts cujo PRAZO DE CONCLUSÃO já chegou (vencidos ou hoje) e ainda em aberto
+    const p = await sql(`select p.title, to_char(p.due_date,'DD/MM') as due, p.status,
+        c.name as client, u.name as resp
       from posts p
       left join clients c on c.id = p.client_id
       left join users u on u.id = p.responsible_id
-      where p.pub_date is not null
-        and p.pub_date < current_date
-        and p.status <> 'Postado'
-      order by p.pub_date asc
-      limit 50`;
-
-    if (!rows.length) {
-      return res.status(200).json({ overdue: 0, sent: false, message: 'Sem tarefas vencidas' });
+      where p.due_date is not null and p.due_date <= current_date and p.status = any($1)
+      order by p.due_date asc limit 80`, [OPEN]);
+    if (p.rows.length) {
+      const lines = p.rows.map((r) => '• *' + r.title + '* — ' + (r.client || 'sem cliente') +
+        ' — concluir até ' + r.due + ' — _' + r.status + '_' + (r.resp ? ' (' + r.resp + ')' : ''));
+      await sendGroup('⏰ *Acttus OS — tarefas a concluir (vencidas/hoje) — ' + p.rows.length + '*\n\n' + lines.join('\n'));
+      out.posts = p.rows.length;
+      await sql('insert into notifications (text, kind, whatsapp_sent) values ($1,$2,$3)',
+        [p.rows.length + ' tarefa(s) a concluir avisada(s) no grupo', 'due', true]);
     }
 
-    const lines = rows.map((r) =>
-      '• *' + r.title + '* — ' + (r.client_name || 'sem cliente') +
-      ' — venceu ' + fmtDate(r.pub_date) +
-      ' — _' + r.status + '_' + (r.resp ? ' (' + r.resp + ')' : ''));
-    const msg = '🟡 *Acttus OS — Tarefas vencidas (' + rows.length + ')*\n\n' + lines.join('\n');
+    // rotinas vencidas → DM no privado do dono (agrupadas por telefone)
+    const r = await sql(`select r.title, to_char(r.due_date,'DD/MM') as due, u.name as owner, u.phone
+      from routines r join users u on u.id = r.owner_id
+      where r.due_date is not null and r.due_date <= current_date and r.done = false
+      order by u.id`);
+    const byPhone = {};
+    for (const row of r.rows) { if (!row.phone) continue; (byPhone[row.phone] = byPhone[row.phone] || { name: row.owner, items: [] }).items.push(row); }
+    for (const phone of Object.keys(byPhone)) {
+      const o = byPhone[phone];
+      const msg = '👋 Oi ' + (o.name || '') + '! Suas rotinas vencidas:\n' + o.items.map((i) => '• ' + i.title + ' (até ' + i.due + ')').join('\n');
+      try { await sendDM(phone, msg); out.routineDMs++; } catch (e) { /* segue mesmo se uma falhar */ }
+    }
 
-    await sendText(msg);
-    await sql`insert into notifications (text, kind, whatsapp_sent)
-              values (${'WhatsApp: ' + rows.length + ' tarefa(s) vencida(s) enviada(s) ao grupo'}, 'due', true)`;
-
-    return res.status(200).json({ overdue: rows.length, sent: true });
+    return res.status(200).json(out);
   } catch (e) {
     return res.status(500).json({ error: String(e.message || e) });
   }

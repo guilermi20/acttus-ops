@@ -18,6 +18,7 @@ function clean(body) {
   if ('status' in body && STATUS.includes(body.status)) o.status = body.status;
   if ('notes' in body) o.notes = String(body.notes || '');
   if ('pub_date' in body) o.pub_date = body.pub_date || null;
+  if ('due_date' in body) o.due_date = body.due_date || null;
   if ('pub_time' in body) o.pub_time = TIMES.includes(body.pub_time) ? body.pub_time : null;
   if ('responsible_id' in body) o.responsible_id = body.responsible_id || null;
   return o;
@@ -25,7 +26,7 @@ function clean(body) {
 
 const SELECT = `
   select p.id, p.client_id, p.title, p.funnel_stage, p.post_type, p.channel, p.status,
-         p.notes, to_char(p.pub_date,'YYYY-MM-DD') as pub_date, p.pub_time,
+         p.notes, to_char(p.pub_date,'YYYY-MM-DD') as pub_date, to_char(p.due_date,'YYYY-MM-DD') as due_date, p.pub_time,
          p.responsible_id, p.created_at, p.updated_at,
          c.name as client_name, c.is_internal, u.name as responsible_name
   from posts p
@@ -49,8 +50,8 @@ export default async function handler(req, res) {
       o.channel = o.channel || 'organico';
       o.status = o.status || 'Agendado';
       const { rows } = await sql`
-        insert into posts (client_id, title, funnel_stage, post_type, channel, status, notes, pub_date, pub_time, responsible_id)
-        values (${o.client_id}, ${o.title}, ${o.funnel_stage}, ${o.post_type}, ${o.channel}, ${o.status}, ${o.notes || ''}, ${o.pub_date}, ${o.pub_time}, ${o.responsible_id})
+        insert into posts (client_id, title, funnel_stage, post_type, channel, status, notes, pub_date, due_date, pub_time, responsible_id)
+        values (${o.client_id}, ${o.title}, ${o.funnel_stage}, ${o.post_type}, ${o.channel}, ${o.status}, ${o.notes || ''}, ${o.pub_date}, ${o.due_date}, ${o.pub_time}, ${o.responsible_id})
         returning id`;
       const { rows: full } = await sql(SELECT + ' where p.id = $1', [rows[0].id]);
       return res.status(201).json(full[0]);

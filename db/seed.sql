@@ -44,3 +44,7 @@ from (values
 join clients c on c.name = v.client
 left join users u on u.name = v.resp
 where not exists (select 1 from posts p where p.title = v.title);
+
+-- Admins iniciais + prazo de conclusão = publicação para posts antigos
+update users set role = 'admin' where email in ('admin@acttus.com.br', 'bigode@acttus.com');
+update posts set due_date = pub_date where due_date is null;

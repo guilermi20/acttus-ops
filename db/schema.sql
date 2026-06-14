@@ -13,6 +13,8 @@ create table if not exists users (
   name text not null,
   cpf text not null unique,
   email text not null,
+  phone text,
+  role text not null default 'member',
   created_at timestamptz not null default now()
 );
 
@@ -27,6 +29,7 @@ create table if not exists posts (
     check (status in ('Agendado','Em produção','Aguardando aprovação','Modificação','Finalizado','Postado')),
   notes text not null default '',
   pub_date date,
+  due_date date,
   pub_time text check (pub_time in ('12:00','18:00')),
   responsible_id uuid references users(id) on delete set null,
   created_at timestamptz not null default now(),
@@ -53,6 +56,41 @@ create table if not exists meetings (
   meeting_date date,
   category text not null default '',
   participants jsonb not null default '[]',
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Rotinas (tarefas pessoais, não-posts; dono = usuário)
+create table if not exists routines (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid references users(id) on delete cascade,
+  title text not null,
+  notes text not null default '',
+  due_date date,
+  done boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Projetos internos + tarefas do projeto
+create table if not exists projects (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  description text not null default '',
+  responsible_id uuid references users(id) on delete set null,
+  status text not null default 'Ativo',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists project_tasks (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid references projects(id) on delete cascade,
+  title text not null,
+  responsible_id uuid references users(id) on delete set null,
+  due_date date,
+  status text not null default 'A fazer',
   notes text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

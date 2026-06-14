@@ -267,3 +267,29 @@ select.select{appearance:none;-webkit-appearance:none;padding-right:30px;backgro
 .nic{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--panel3)}
 .nt{font-size:13px;font-weight:500;line-height:1.35}
 .nd{font-size:11px;color:var(--mut2);margin-top:2px}
+
+/* ---------- SWITCH de tema ---------- */
+.theme-row{display:flex;align-items:center;gap:9px;padding:8px 10px;color:var(--mut);font-size:13px;font-weight:500}
+.theme-row .i{color:var(--mut)}
+.switch{margin-left:auto;position:relative;width:42px;height:23px;border-radius:13px;background:var(--line2);border:1px solid var(--line2);transition:.16s;flex:0 0 auto;padding:0}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:#fff;transition:.16s;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+.switch.on{background:var(--yellow);border-color:var(--yellow)}
+.switch.on::after{left:21px}
+
+/* ---------- TEMA CLARO (opcional) ---------- */
+body.light{
+ --bg:#F6F3EE; --panel:#FFFFFF; --panel2:#FAF7F1; --panel3:#F0EBE1;
+ --sb:#FFFFFF; --sb2:#F3EEE4; --line:#EAE3D7; --line2:#E0D8C8;
+ --ink:#1A1714; --ink2:#4A443B; --mut:#8A8273; --mut2:#A7A093;
+ --yellow-line:rgba(245,183,0,.5);
+ --sh:0 1px 2px rgba(26,23,20,.06); --sh-md:0 6px 20px rgba(26,23,20,.10); --sh-lg:0 20px 50px rgba(26,23,20,.18);
+}
+body.light .rail{border-right-color:var(--line)}
+body.light .brand .nm{color:var(--ink)}
+body.light .bell{background:var(--panel2);color:var(--ink2)}
+body.light .navitem:hover,body.light .out:hover{background:var(--panel3)}
+body.light .cal-ev.c-yellow{color:#8A6500}
+body.light .cal-ev.c-pink{color:#B0246F}
+body.light .toast{background:#FFFFFF;color:#1A1714}
+body.light ::-webkit-scrollbar-thumb{background:#D9D0C0}
+body.light .sb-scroll::-webkit-scrollbar-thumb{background:#E0D8C8}

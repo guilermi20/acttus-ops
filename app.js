@@ -24,7 +24,9 @@ var ICONS = {
  dot:'<circle cx="12" cy="12" r="3"/>',
  edit:'<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/>',
  zap:'<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
- alert:'<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'
+ alert:'<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+ moon:'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+ sun:'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>'
 };
 function ic(n, s) { return '<svg class="i" width="' + (s || 18) + '" height="' + (s || 18) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[n] || ICONS.dot) + '</svg>'; }
 
@@ -460,6 +462,16 @@ function toggleNotifs() {
 /* ===================================================================
    LOGIN + BOOT
    =================================================================== */
+/* ---------- tema (dark padrão / claro opcional) ---------- */
+function currentTheme() { try { return localStorage.getItem('acttus_theme') || 'dark'; } catch (e) { return 'dark'; } }
+function applyTheme(t) {
+ var dark = t !== 'light';
+ document.body.classList.toggle('light', !dark);
+ var sw = $('#themeSwitch'); if (sw) sw.classList.toggle('on', dark);
+ var ti = $('#themeIc'); if (ti) ti.innerHTML = ic(dark ? 'moon' : 'sun', 16);
+}
+function setTheme(t) { try { localStorage.setItem('acttus_theme', t); } catch (e) {} applyTheme(t); }
+
 function showApp() {
  $('#login').style.display = 'none';
  $('#app').hidden = false;
@@ -469,6 +481,8 @@ function showApp() {
  $('#btnCriar').onclick = function () { openPostModal(null); };
  $('#btnBell').onclick = toggleNotifs;
  $('#logout').onclick = function () { S.logout(); location.reload(); };
+ var sw = $('#themeSwitch'); if (sw) sw.onclick = function () { setTheme(document.body.classList.contains('light') ? 'dark' : 'light'); };
+ applyTheme(currentTheme());
  renderMe(); renderNav(); renderView(); renderBell();
 }
 function renderMe() {
@@ -510,6 +524,7 @@ function onStoreChange() {
  renderNav(); renderView(); renderBell();
 }
 
+applyTheme(currentTheme());
 bindLogin();
 if (S.isAuthed()) { boot(); } else { showLogin(); }
 

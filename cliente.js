@@ -56,7 +56,7 @@
     var title = ($('#sTitle').value || '').trim(); if (!title) { toast('Escreva sua ideia', 'err'); return; }
     var notes = $('#sNotes').value;
     var btn = $('#sform').parentNode.querySelector('button[type=submit]'); if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
-    fetch('/api/public/idea?t=' + encodeURIComponent(token), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title, notes: notes }) })
+    fetch('/api/public?t=' + encodeURIComponent(token), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title, notes: notes }) })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (o) { if (!o.ok) throw new Error((o.j && o.j.error) || 'Falha ao enviar'); toast('Ideia enviada! Obrigado 🙌', 'success'); closeModal(); })
       .catch(function (e) { toast(e.message || 'Falha ao enviar', 'err'); if (btn) { btn.disabled = false; btn.textContent = 'Enviar ideia'; } });
@@ -64,7 +64,7 @@
 
   function load() {
     if (!token) { render(); return; }
-    fetch('/api/public/client?t=' + encodeURIComponent(token))
+    fetch('/api/public?t=' + encodeURIComponent(token))
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (o) { if (!o.ok) throw new Error((o.j && o.j.error) || 'Erro'); data = o.j; render(); })
       .catch(function (e) { $('#pub').innerHTML = '<div class="puberr">' + esc(e.message || 'Não foi possível carregar o painel.') + '</div>'; });

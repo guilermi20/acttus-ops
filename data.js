@@ -60,7 +60,7 @@
       req('GET', '/api/meetings'),
       req('GET', '/api/routines'),
       req('GET', '/api/projects'),
-      req('GET', '/api/project-tasks'),
+      req('GET', '/api/projects?entity=task'),
       req('GET', '/api/ideas')
     ]);
     state.clients = r[0] || [];
@@ -116,9 +116,9 @@
   function createProject(b) { return req('POST', '/api/projects', b).then(function (x) { state.projects.unshift(x); emit(); return x; }); }
   function updateProject(id, b) { return req('PATCH', '/api/projects?id=' + encodeURIComponent(id), b).then(function (x) { upsert(state.projects, x); emit(); return x; }); }
   function deleteProject(id) { return req('DELETE', '/api/projects?id=' + encodeURIComponent(id)).then(function () { state.projects = state.projects.filter(function (x) { return x.id !== id; }); state.projectTasks = state.projectTasks.filter(function (t) { return t.project_id !== id; }); emit(); }); }
-  function createProjectTask(b) { return req('POST', '/api/project-tasks', b).then(function (x) { state.projectTasks.unshift(x); emit(); return x; }); }
-  function updateProjectTask(id, b) { return req('PATCH', '/api/project-tasks?id=' + encodeURIComponent(id), b).then(function (x) { upsert(state.projectTasks, x); emit(); return x; }); }
-  function deleteProjectTask(id) { return req('DELETE', '/api/project-tasks?id=' + encodeURIComponent(id)).then(function () { state.projectTasks = state.projectTasks.filter(function (x) { return x.id !== id; }); emit(); }); }
+  function createProjectTask(b) { return req('POST', '/api/projects?entity=task', b).then(function (x) { state.projectTasks.unshift(x); emit(); return x; }); }
+  function updateProjectTask(id, b) { return req('PATCH', '/api/projects?entity=task&id=' + encodeURIComponent(id), b).then(function (x) { upsert(state.projectTasks, x); emit(); return x; }); }
+  function deleteProjectTask(id) { return req('DELETE', '/api/projects?entity=task&id=' + encodeURIComponent(id)).then(function () { state.projectTasks = state.projectTasks.filter(function (x) { return x.id !== id; }); emit(); }); }
   function allRoutines() { return req('GET', '/api/routines?scope=all'); }
   function createMeeting(b) { return req('POST', '/api/meetings', b).then(function (m) { state.meetings.unshift(m); emit(); return m; }); }
   function updateMeeting(id, b) { return req('PATCH', '/api/meetings?id=' + encodeURIComponent(id), b).then(function (m) { var i = -1; for (var k = 0; k < state.meetings.length; k++) if (state.meetings[k].id === id) { i = k; break; } if (i >= 0) state.meetings[i] = m; else state.meetings.unshift(m); emit(); return m; }); }

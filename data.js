@@ -103,6 +103,7 @@
   function sortClients(a, b) { if (a.is_internal !== b.is_internal) return a.is_internal ? -1 : 1; return a.name.localeCompare(b.name); }
   function createClient(b) { return req('POST', '/api/clients', b).then(function (c) { state.clients.push(c); state.clients.sort(sortClients); emit(); return c; }); }
   function updateClient(id, b) { return req('PATCH', '/api/clients?id=' + encodeURIComponent(id), b).then(function (c) { var i = -1; for (var k = 0; k < state.clients.length; k++) if (state.clients[k].id === id) { i = k; break; } if (i >= 0) state.clients[i] = c; state.clients.sort(sortClients); emit(); return c; }); }
+  function togglePlan(clientId, ym) { return req('POST', '/api/clients?entity=plan', { id: clientId, ym: ym }).then(function (c) { var i = -1; for (var k = 0; k < state.clients.length; k++) if (state.clients[k].id === clientId) { i = k; break; } if (i >= 0) state.clients[i] = c; emit(); return c; }); }
   function createIdea(b) { return req('POST', '/api/ideas', b).then(function (x) { state.ideas.unshift(x); emit(); return x; }); }
   function updateIdea(id, b) { return req('PATCH', '/api/ideas?id=' + encodeURIComponent(id), b).then(function (x) { var i = -1; for (var k = 0; k < state.ideas.length; k++) if (state.ideas[k].id === id) { i = k; break; } if (i >= 0) state.ideas[i] = x; emit(); return x; }); }
   function deleteIdea(id) { return req('DELETE', '/api/ideas?id=' + encodeURIComponent(id)).then(function () { state.ideas = state.ideas.filter(function (x) { return x.id !== id; }); emit(); }); }
@@ -137,7 +138,7 @@
     login: login, logout: function () { doLogout(); emit(); },
     loadAll: loadAll, refreshPosts: refreshPosts, refreshNotifs: refreshNotifs,
     createPost: createPost, updatePost: updatePost, deletePost: deletePost,
-    createClient: createClient, updateClient: updateClient, createUser: createUser, updateUser: updateUser, markNotifsRead: markNotifsRead,
+    createClient: createClient, updateClient: updateClient, togglePlan: togglePlan, createUser: createUser, updateUser: updateUser, markNotifsRead: markNotifsRead,
     createIdea: createIdea, updateIdea: updateIdea, deleteIdea: deleteIdea,
     createMeeting: createMeeting, updateMeeting: updateMeeting, deleteMeeting: deleteMeeting,
     createRoutine: createRoutine, updateRoutine: updateRoutine, deleteRoutine: deleteRoutine,

@@ -396,3 +396,15 @@ button.tag.ok:hover{filter:brightness(1.1)}
 .pp-t{font-size:14.5px;font-weight:600}
 .pp-m{font-size:12.5px;color:var(--mut);margin-top:2px}
 .pub-foot{margin-top:34px;text-align:center;color:var(--mut2);font-size:12px}
+.pub-approve h2{color:var(--amber)}
+.pub-post.approve{border-color:var(--amber);background:var(--amber-soft);cursor:pointer}
+.pub-post.approve:hover{filter:brightness(1.05)}
+.rev-title{font-size:17px;font-weight:700;line-height:1.3}
+.rev-meta{color:var(--mut);font-size:13px;margin-top:4px}
+
+/* drag no calendário + nota de reprovação */
+.cal-ev{cursor:grab}
+.cal-ev.dragging{opacity:.45}
+.cal-cell.over{border-color:var(--yellow);box-shadow:0 0 0 2px var(--yellow-soft);background:var(--yellow-soft)}
+.note.rej{border-color:rgba(232,103,94,.45);background:var(--red-soft)}
+.note.rej .i{color:var(--red)}

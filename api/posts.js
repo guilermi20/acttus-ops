@@ -21,13 +21,14 @@ function clean(body) {
   if ('due_date' in body) o.due_date = body.due_date || null;
   if ('pub_time' in body) o.pub_time = TIMES.includes(body.pub_time) ? body.pub_time : null;
   if ('responsible_id' in body) o.responsible_id = body.responsible_id || null;
+  if ('reject_reason' in body) o.reject_reason = body.reject_reason || null;
   return o;
 }
 
 const SELECT = `
   select p.id, p.client_id, p.title, p.funnel_stage, p.post_type, p.channel, p.status,
          p.notes, to_char(p.pub_date,'YYYY-MM-DD') as pub_date, to_char(p.due_date,'YYYY-MM-DD') as due_date, p.pub_time,
-         p.responsible_id, p.created_at, p.updated_at,
+         p.responsible_id, p.reject_reason, p.created_at, p.updated_at,
          c.name as client_name, c.is_internal, u.name as responsible_name
   from posts p
   left join clients c on c.id = p.client_id

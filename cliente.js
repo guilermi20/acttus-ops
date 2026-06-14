@@ -29,15 +29,45 @@
         return '<div class="pub-post"><div class="pp-l"><div class="pp-t">' + esc(p.title) + '</div><div class="pp-m">' + (p.pub_time ? p.pub_time + ' · ' : '') + (TYPE[p.post_type] || p.post_type) + '</div></div>' + badge(p.status, STATUS_COLOR[p.status]) + '</div>';
       }).join('') + '</div>';
     }).join('') : '<div class="empty">Nenhuma publicação planejada para este mês ainda.</div>';
+    var pend = posts.filter(function (p) { return p.status === 'Aguardando aprovação' && p.id; });
+    var approval = pend.length ? '<div class="pub-section pub-approve"><h2>⏳ Aguardando sua aprovação (' + pend.length + ')</h2>' +
+      pend.map(function (p) {
+        return '<div class="pub-post approve" data-rev="' + p.id + '"><div class="pp-l"><div class="pp-t">' + esc(p.title) + '</div><div class="pp-m">' + (p.pub_date ? fmtDay(p.pub_date) + ' · ' : '') + (p.pub_time ? p.pub_time + ' · ' : '') + (TYPE[p.post_type] || p.post_type) + '</div></div><span class="btn sm pri">Revisar</span></div>';
+      }).join('') + '</div>' : '';
     pub.innerHTML =
       '<div class="pub-cover"' + cover + '><div class="pub-cover-sh"></div></div>' +
       '<div class="pub-wrap">' +
         '<div class="pub-head">' + av + '<div class="pub-h-tx"><h1>' + esc(c.name) + '</h1><div class="pub-sub">Calendário & demandas · Acttus</div></div>' +
           '<button class="btn pri" id="suggest">💡 Sugerir ideia</button></div>' +
+        approval +
         '<div class="pub-section"><h2>Publicações planejadas</h2>' + list + '</div>' +
         '<div class="pub-foot">Painel de visualização — mantido em tempo real pela equipe Acttus.</div>' +
       '</div>';
     $('#suggest').onclick = openSuggest;
+    var byId = {}; posts.forEach(function (p) { if (p.id) byId[p.id] = p; });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-rev]'), function (el2) { el2.onclick = function () { var p = byId[el2.getAttribute('data-rev')]; if (p) openReview(p); }; });
+  }
+  function openReview(post) {
+    $('#mboxc').innerHTML =
+      '<div class="mhd"><span class="mic">👀</span><h3>Revisar publicação</h3><button class="mx" id="mx" type="button">✕</button></div>' +
+      '<div class="mbd"><div class="rev-title">' + esc(post.title) + '</div><div class="rev-meta">' + (post.pub_date ? fmtDay(post.pub_date) : '') + (post.pub_time ? ' · ' + post.pub_time : '') + ' · ' + (TYPE[post.post_type] || post.post_type) + '</div>' +
+        '<div id="rejWrap" style="display:none;margin-top:14px"><label class="fld"><span>Motivo da reprovação</span><textarea id="rejReason" rows="4" placeholder="Explique o que precisa mudar…"></textarea></label></div></div>' +
+      '<div class="mft"><button type="button" class="btn danger" id="btnReject">❌ Reprovar</button><div class="mft-r"><button type="button" class="btn" id="btnCancel">Cancelar</button><button type="button" class="btn pri" id="btnApprove">✅ Aprovar</button></div></div>';
+    $('#modal').classList.add('show');
+    $('#mx').onclick = closeModal; $('#btnCancel').onclick = closeModal; $('#modalBg').onclick = closeModal;
+    $('#btnApprove').onclick = function () { act('approve', post.id); };
+    $('#btnReject').onclick = function () {
+      var w = $('#rejWrap');
+      if (w.style.display === 'none') { w.style.display = 'block'; $('#rejReason').focus(); $('#btnReject').textContent = 'Confirmar reprovação'; }
+      else { var reason = ($('#rejReason').value || '').trim(); if (!reason) { toast('Escreva o motivo', 'err'); return; } act('reject', post.id, reason); }
+    };
+  }
+  function act(action, postId, reason) {
+    var body = { action: action, post_id: postId }; if (reason) body.reason = reason;
+    fetch('/api/public?t=' + encodeURIComponent(token), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (o) { if (!o.ok) throw new Error((o.j && o.j.error) || 'Falha'); toast(action === 'approve' ? 'Post aprovado ✅' : 'Post reprovado', 'success'); closeModal(); load(); })
+      .catch(function (e) { toast(e.message || 'Falha', 'err'); });
   }
 
   function closeModal() { $('#modal').classList.remove('show'); $('#mboxc').innerHTML = ''; }

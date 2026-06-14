@@ -220,7 +220,7 @@ function renderFunil(el) {
 /* ===================================================================
    CALENDÁRIO unificado
    =================================================================== */
-var calY, calM, calClient = '';
+var calY, calM, calClient = '', calDragId = null;
 function calInit() { if (calY == null) { var t = todayISO().split('-'); calY = +t[0]; calM = +t[1] - 1; } }
 // Monta a grade do mês (barra + dias) para uma lista de posts já filtrada.
 function calGridHTML(posts) {
@@ -239,7 +239,7 @@ function calGridHTML(posts) {
   var iso = calY + '-' + String(calM + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
   var list = byDay[d] || [];
   var evs = list.map(function (p) {
-   return '<div class="cal-ev c-' + postColor(p) + '" data-post="' + p.id + '" title="' + esc(p.title + ' — ' + (p.client_name || 'Sem cliente') + ' — ' + typeLabel(p.post_type)) + '">' +
+   return '<div class="cal-ev c-' + postColor(p) + '" draggable="true" data-post="' + p.id + '" title="' + esc(p.title + ' — ' + (p.client_name || 'Sem cliente') + ' — ' + typeLabel(p.post_type)) + '">' +
     '<div class="ce-t">' + (p.pub_time ? '<b>' + p.pub_time + '</b> ' : '') + esc(p.title) + '</div>' +
     '<div class="ce-m">' + esc(p.client_name || 'Sem cliente') + ' · ' + typeLabel(p.post_type) + '</div></div>';
   }).join('');
@@ -260,7 +260,21 @@ function bindCal(el, rerender, addClientId) {
  $('#calPrev', el).onclick = function () { calM--; if (calM < 0) { calM = 11; calY--; } rerender(); };
  $('#calNext', el).onclick = function () { calM++; if (calM > 11) { calM = 0; calY++; } rerender(); };
  $('#calToday', el).onclick = function () { var t = todayISO().split('-'); calY = +t[0]; calM = +t[1] - 1; rerender(); };
- $$('[data-post]', el).forEach(function (e) { e.onclick = function (ev) { ev.stopPropagation(); var p = postById(e.getAttribute('data-post')); if (p) openPostModal(p); }; });
+ $$('[data-post]', el).forEach(function (e) {
+  e.onclick = function (ev) { ev.stopPropagation(); var p = postById(e.getAttribute('data-post')); if (p) openPostModal(p); };
+  e.ondragstart = function (ev) { calDragId = e.getAttribute('data-post'); e.classList.add('dragging'); ev.dataTransfer.effectAllowed = 'move'; ev.stopPropagation(); };
+  e.ondragend = function () { calDragId = null; e.classList.remove('dragging'); };
+ });
+ $$('[data-day]', el).forEach(function (cell) {
+  cell.ondragover = function (ev) { ev.preventDefault(); cell.classList.add('over'); };
+  cell.ondragleave = function () { cell.classList.remove('over'); };
+  cell.ondrop = function (ev) {
+   ev.preventDefault(); cell.classList.remove('over');
+   var id = calDragId, day = cell.getAttribute('data-day'); if (!id || !day) return;
+   var p = postById(id); if (!p || p.pub_date === day) return;
+   S.updatePost(id, { pub_date: day }).then(function () { toast('Publicação movida para ' + fmtDay(day)); }).catch(function (er) { toast(er.message, 'err'); });
+  };
+ });
  $$('[data-add]', el).forEach(function (e) { e.onclick = function (ev) { ev.stopPropagation(); openPostModal(null, { pub_date: e.getAttribute('data-add'), client_id: addClientId || '' }); }; });
 }
 function renderCalendario(el) {
@@ -281,6 +295,9 @@ function openCliente(id) { clienteId = id; route = 'cliente'; renderNav(); rende
 function renderCliente(el) {
  var cl = clientById(clienteId);
  if (!cl) { go('clientes'); return; }
+ calInit();
+ var ymPlan = calY + '-' + String(calM + 1).padStart(2, '0');
+ var planned = (cl.planned_months || []).indexOf(ymPlan) >= 0;
  var posts = st.posts.filter(function (p) { return p.client_id === cl.id; });
  var t = posts.length, counts = { topo: 0, meio: 0, fundo: 0 };
  posts.forEach(function (p) { counts[p.funnel_stage] = (counts[p.funnel_stage] || 0) + 1; });
@@ -291,8 +308,12 @@ function renderCliente(el) {
   '<button class="btn" data-cliedit2="1">' + ic('edit', 15) + ' Editar</button>' +
   '<button class="btn pri" data-newc="1">' + ic('plus') + ' Novo post</button>') +
   '<div class="panel"><div class="hd"><h3>Kanban</h3><span class="sp"></span><span class="sub">arraste para mudar o status</span></div><div class="bd"><div class="board">' + statusColumns(posts) + '</div></div></div>' +
-  '<div class="panel"><div class="hd"><h3>Calendário</h3></div><div class="bd">' + calGridHTML(posts) + '</div></div>';
+  '<div class="panel"><div class="hd"><h3>Calendário</h3><span class="sp"></span>' +
+   (planned ? '<span class="bg c-green"><span class="bgdot"></span>Mês planejado</span>' : '') +
+   '<button class="btn sm' + (planned ? ' pri' : '') + '" id="togglePlan">' + (planned ? ic('check', 14) + ' Planejado' : 'Marcar mês como planejado') + '</button>' +
+   '</div><div class="bd">' + calGridHTML(posts) + '</div></div>';
  $('[data-back]', el).onclick = function () { go('clientes'); };
+ var tp = $('#togglePlan', el); if (tp) tp.onclick = function () { S.togglePlan(cl.id, ymPlan).then(function () { toast(planned ? 'Mês desmarcado' : 'Mês marcado como planejado'); renderCliente(el); }).catch(function (e) { toast(e.message, 'err'); }); };
  var clk = $('[data-clilink]', el); if (clk) clk.onclick = function () { copyPanelLink(cl.share_token); };
  var ced = $('[data-cliedit2]', el); if (ced) ced.onclick = function () { openClientModal(cl); };
  $$('[data-newc]', el).forEach(function (b) { b.onclick = function () { openPostModal(null, { client_id: cl.id }); }; });
@@ -759,7 +780,8 @@ function openPostModal(post, defaults) {
  var statusOpts = STATUS.map(function (s) { return '<option value="' + esc(s) + '"' + (s === cur.status ? ' selected' : '') + '>' + esc(s) + '</option>'; }).join('');
  var timeOpts = TIMES.map(function (t) { return '<option value="' + t + '"' + (t === cur.pub_time ? ' selected' : '') + '>' + t + '</option>'; }).join('');
 
- var body =
+ var rejNote = (editing && p.reject_reason) ? '<div class="note rej">' + ic('alert', 15) + ' <span><b>Reprovado pelo cliente:</b> ' + esc(p.reject_reason) + '</span></div>' : '';
+ var body = rejNote +
   '<label class="fld"><span>Título do post</span><input id="pTitle" value="' + esc(p.title || d.title || '') + '" placeholder="Ex.: 3 dúvidas sobre..."></label>' +
   '<div class="mrow2"><label class="fld"><span>Cliente</span><select id="pClient">' + (clientOpts || '<option value="">Crie um cliente antes</option>') + '</select></label>' +
   '<label class="fld"><span>Responsável</span><select id="pResp">' + userOpts + '</select></label></div>' +

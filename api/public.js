@@ -1,5 +1,8 @@
-// PÚBLICO (sem login): painel do cliente (GET) e sugerir ideia (POST), via share_token ?t=
+// PÚBLICO (sem login), via share_token ?t=:
+//  GET  → painel do cliente (publicações do mês)
+//  POST → action: 'suggest' (ideia) | 'approve' | 'reject' (de posts em aprovação)
 import { sql } from '../lib/db.js';
+import { sendGroup } from '../lib/whatsapp.js';
 
 export default async function handler(req, res) {
   const t = (req.query && req.query.t) || (req.body && req.body.t);
@@ -10,7 +13,7 @@ export default async function handler(req, res) {
     const client = c.rows[0];
 
     if (req.method === 'GET') {
-      const p = await sql(`select to_char(pub_date,'YYYY-MM-DD') as pub_date, pub_time, title, post_type, funnel_stage, status
+      const p = await sql(`select id, to_char(pub_date,'YYYY-MM-DD') as pub_date, pub_time, title, post_type, funnel_stage, status
         from posts
         where client_id = $1 and pub_date is not null and pub_date >= date_trunc('month', current_date)
         order by pub_date, pub_time`, [client.id]);
@@ -22,6 +25,29 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       const b = req.body || {};
+      const action = b.action || 'suggest';
+
+      if (action === 'approve' || action === 'reject') {
+        const postId = b.post_id;
+        if (!postId) return res.status(400).json({ error: 'post_id ausente' });
+        const pr = await sql('select id, title, status from posts where id = $1 and client_id = $2', [postId, client.id]);
+        if (!pr.rows.length) return res.status(404).json({ error: 'Post não encontrado' });
+        const post = pr.rows[0];
+        if (action === 'approve') {
+          await sql("update posts set status = 'Finalizado', reject_reason = null, updated_at = now() where id = $1", [postId]);
+          try { await sendGroup('✅ *Aprovado pelo cliente* — ' + client.name + '\n*' + post.title + '*'); } catch (e) {}
+          await sql('insert into notifications (text, kind) values ($1, $2)', [client.name + ' aprovou: ' + post.title, 'approval']);
+          return res.status(200).json({ ok: true, status: 'Finalizado' });
+        }
+        const reason = String(b.reason || '').trim();
+        if (!reason) return res.status(400).json({ error: 'Informe o motivo da reprovação' });
+        await sql('update posts set status = \'Modificação\', reject_reason = $2, updated_at = now() where id = $1', [postId, reason.slice(0, 2000)]);
+        try { await sendGroup('❌ *Reprovado pelo cliente* — ' + client.name + '\n*' + post.title + '*\nMotivo: ' + reason); } catch (e) {}
+        await sql('insert into notifications (text, kind) values ($1, $2)', [client.name + ' reprovou: ' + post.title, 'approval']);
+        return res.status(200).json({ ok: true, status: 'Modificação' });
+      }
+
+      // sugerir ideia (default)
       const title = String(b.title || '').trim();
       if (!title) return res.status(400).json({ error: 'Descreva a ideia' });
       await sql`insert into ideas (client_id, title, notes, status, source)

@@ -1,11 +1,27 @@
 import { sql, requireAuth } from '../lib/db.js';
 import crypto from 'node:crypto';
 
-const COLS = 'id, name, is_internal, share_token, cover_url, avatar_url';
+const COLS = 'id, name, is_internal, share_token, cover_url, avatar_url, planned_months';
+
+// Marca/desmarca um mês (YYYY-MM) como planejado para o cliente.
+async function togglePlan(req, res) {
+  const id = (req.query && req.query.id) || (req.body && req.body.id);
+  const ym = req.body && req.body.ym;
+  if (!id || !ym) return res.status(400).json({ error: 'id e ym são obrigatórios' });
+  const cur = await sql('select planned_months from clients where id = $1', [id]);
+  if (!cur.rows.length) return res.status(404).json({ error: 'Cliente não encontrado' });
+  let arr = cur.rows[0].planned_months;
+  if (!Array.isArray(arr)) arr = [];
+  arr = arr.indexOf(ym) >= 0 ? arr.filter((x) => x !== ym) : arr.concat([ym]);
+  await sql('update clients set planned_months = $1::jsonb where id = $2', [JSON.stringify(arr), id]);
+  const { rows } = await sql('select ' + COLS + ' from clients where id = $1', [id]);
+  return res.status(200).json(rows[0]);
+}
 
 export default async function handler(req, res) {
   if (!requireAuth(req, res)) return;
   try {
+    if (req.query && req.query.entity === 'plan') return await togglePlan(req, res);
     if (req.method === 'GET') {
       const { rows } = await sql('select ' + COLS + ' from clients order by is_internal desc, name');
       return res.status(200).json(rows);

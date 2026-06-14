@@ -1,5 +1,7 @@
-import { sql, requireAuth } from '../lib/db.js';
+import { sql, requireAuth, verifyToken } from '../lib/db.js';
 import { sendText } from '../lib/whatsapp.js';
+import { del } from '@vercel/blob';
+import { handleUpload } from '@vercel/blob/client';
 
 const FUNNEL = ['topo', 'meio', 'fundo'];
 const TYPES = ['carrossel', 'reels', 'estatico'];
@@ -22,19 +24,43 @@ function clean(body) {
   if ('pub_time' in body) o.pub_time = TIMES.includes(body.pub_time) ? body.pub_time : null;
   if ('responsible_id' in body) o.responsible_id = body.responsible_id || null;
   if ('reject_reason' in body) o.reject_reason = body.reject_reason || null;
+  if ('caption' in body) o.caption = String(body.caption || '');
+  if ('media' in body) o.media = Array.isArray(body.media) ? body.media.slice(0, 10) : [];
   return o;
 }
 
 const SELECT = `
   select p.id, p.client_id, p.title, p.funnel_stage, p.post_type, p.channel, p.status,
          p.notes, to_char(p.pub_date,'YYYY-MM-DD') as pub_date, to_char(p.due_date,'YYYY-MM-DD') as due_date, p.pub_time,
-         p.responsible_id, p.reject_reason, p.created_at, p.updated_at,
+         p.responsible_id, p.reject_reason, p.caption, p.media, p.created_at, p.updated_at,
          c.name as client_name, c.is_internal, u.name as responsible_name
   from posts p
   left join clients c on c.id = p.client_id
   left join users u on u.id = p.responsible_id`;
 
+// Upload de anexo direto para o Vercel Blob (token gerado server-side; auth via clientPayload).
+async function handleBlobUpload(req, res) {
+  try {
+    const json = await handleUpload({
+      body: req.body,
+      request: req,
+      onBeforeGenerateToken: async (pathname, clientPayload) => {
+        if (!verifyToken(clientPayload)) throw new Error('Não autenticado');
+        return {
+          allowedContentTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/quicktime', 'video/webm'],
+          maximumSizeInBytes: 200 * 1024 * 1024,
+        };
+      },
+      onUploadCompleted: async () => {},
+    });
+    return res.status(200).json(json);
+  } catch (e) {
+    return res.status(400).json({ error: String(e.message || e) });
+  }
+}
+
 export default async function handler(req, res) {
+  if (req.query && req.query.action === 'upload') return handleBlobUpload(req, res);
   if (!requireAuth(req, res)) return;
   try {
     if (req.method === 'GET') {
@@ -51,8 +77,8 @@ export default async function handler(req, res) {
       o.channel = o.channel || 'organico';
       o.status = o.status || 'Agendado';
       const { rows } = await sql`
-        insert into posts (client_id, title, funnel_stage, post_type, channel, status, notes, pub_date, due_date, pub_time, responsible_id)
-        values (${o.client_id}, ${o.title}, ${o.funnel_stage}, ${o.post_type}, ${o.channel}, ${o.status}, ${o.notes || ''}, ${o.pub_date}, ${o.due_date}, ${o.pub_time}, ${o.responsible_id})
+        insert into posts (client_id, title, funnel_stage, post_type, channel, status, notes, pub_date, due_date, pub_time, responsible_id, caption, media)
+        values (${o.client_id}, ${o.title}, ${o.funnel_stage}, ${o.post_type}, ${o.channel}, ${o.status}, ${o.notes || ''}, ${o.pub_date}, ${o.due_date}, ${o.pub_time}, ${o.responsible_id}, ${o.caption || ''}, ${JSON.stringify(o.media || [])}::jsonb)
         returning id`;
       const { rows: full } = await sql(SELECT + ' where p.id = $1', [rows[0].id]);
       return res.status(201).json(full[0]);
@@ -62,13 +88,20 @@ export default async function handler(req, res) {
       const id = (req.query && req.query.id) || (req.body && req.body.id);
       if (!id) return res.status(400).json({ error: 'id é obrigatório' });
       const o = clean(req.body || {});
-      const keys = Object.keys(o);
-      if (!keys.length) return res.status(400).json({ error: 'Nada para atualizar' });
       // status anterior (para notificar mudança de coluna)
       let prevStatus = null;
       if (o.status) { const cur = await sql('select status from posts where id = $1', [id]); prevStatus = cur.rows[0] && cur.rows[0].status; }
-      const sets = keys.map((k, i) => k + ' = $' + (i + 1)).join(', ');
-      const vals = keys.map((k) => o[k]);
+      // virou "Postado": apaga os anexos do Blob e zera o media (economiza storage)
+      if (o.status === 'Postado') {
+        const m = await sql('select media from posts where id = $1', [id]);
+        const media = (m.rows[0] && m.rows[0].media) || [];
+        for (const att of media) { if (att && att.url) { try { await del(att.url); } catch (e) {} } }
+        o.media = [];
+      }
+      const keys = Object.keys(o);
+      if (!keys.length) return res.status(400).json({ error: 'Nada para atualizar' });
+      const sets = keys.map((k, i) => (k === 'media' ? k + ' = $' + (i + 1) + '::jsonb' : k + ' = $' + (i + 1))).join(', ');
+      const vals = keys.map((k) => (k === 'media' ? JSON.stringify(o[k] || []) : o[k]));
       vals.push(id);
       const upd = await sql('update posts set ' + sets + ', updated_at = now() where id = $' + vals.length + ' returning id', vals);
       if (!upd.rows.length) return res.status(404).json({ error: 'Post não encontrado' });

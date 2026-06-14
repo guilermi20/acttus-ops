@@ -13,7 +13,7 @@ export default async function handler(req, res) {
     const client = c.rows[0];
 
     if (req.method === 'GET') {
-      const p = await sql(`select id, to_char(pub_date,'YYYY-MM-DD') as pub_date, pub_time, title, post_type, funnel_stage, status
+      const p = await sql(`select id, to_char(pub_date,'YYYY-MM-DD') as pub_date, pub_time, title, post_type, funnel_stage, status, caption, media
         from posts
         where client_id = $1 and pub_date is not null and pub_date >= date_trunc('month', current_date)
         order by pub_date, pub_time`, [client.id]);

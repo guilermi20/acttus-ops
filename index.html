@@ -42,7 +42,7 @@ window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;acttu
 <!-- APP -->
 <div class="app" id="app" hidden>
  <aside class="rail">
-  <div class="brand"><span class="av">A</span><div><div class="nm">Acttus</div><div class="sub">Calendário editorial</div></div></div>
+  <div class="brand"><span class="av brand-logo"><img src="/logo.png" alt="Acttus" onerror="var s=this.parentNode;s.classList.remove('brand-logo');s.textContent='A'"></span><div><div class="nm">Acttus</div><div class="sub">Calendário editorial</div></div></div>
   <div class="railact"><button class="btn pri sm" id="btnCriar"></button><button class="bell" id="btnBell"><span id="bellIc"></span><span class="bdot" id="bellDot" hidden>0</span></button></div>
   <nav class="nav sb-scroll" id="nav"></nav>
   <div class="railfoot"><div class="theme-row"><span id="themeIc"></span> Modo escuro <button class="switch on" id="themeSwitch" type="button" role="switch" aria-label="Alternar tema claro/escuro"></button></div><div class="merow" id="meRow"></div><div class="out" id="logout"><span id="outIc"></span> Sair</div></div>

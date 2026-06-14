@@ -767,6 +767,7 @@ function openPostModal(post, defaults) {
  var p = post || {};
  var d = defaults || {};
  var editing = !!post;
+ var media = (p.media || []).slice();
  var cur = {
   client_id: p.client_id || d.client_id || (st.clients[0] && st.clients[0].id) || '',
   funnel_stage: p.funnel_stage || 'topo',
@@ -792,7 +793,9 @@ function openPostModal(post, defaults) {
   '<label class="fld"><span>Prazo de conclusão</span><input type="date" id="pDue" value="' + esc(p.due_date || '') + '"></label></div>' +
   '<div class="mrow2"><label class="fld"><span>Horário</span><select id="pTime">' + timeOpts + '</select></label>' +
   '<label class="fld"><span>Status</span><select id="pStatus">' + statusOpts + '</select></label></div>' +
-  '<label class="fld"><span>Observações</span><textarea id="pNotes" rows="3" placeholder="Briefing, links, referências...">' + esc(p.notes || d.notes || '') + '</textarea></label>';
+  '<label class="fld"><span>Observações</span><textarea id="pNotes" rows="3" placeholder="Briefing, links, referências...">' + esc(p.notes || d.notes || '') + '</textarea></label>' +
+  '<label class="fld"><span>Legenda da publicação</span><textarea id="pCaption" rows="3" placeholder="Texto que vai na legenda do post (o cliente vê no painel)">' + esc(p.caption || '') + '</textarea></label>' +
+  '<div class="fld"><span>Anexos (imagem/vídeo — somem quando o post vira "Postado")</span><div class="att-list" id="attList"></div><label class="att-add">' + ic('plus', 14) + ' Adicionar arquivo<input type="file" id="attFile" accept="image/*,video/*" hidden></label></div>';
 
  var extra = editing ? '<button class="btn danger" id="pDel">' + ic('trash', 15) + ' Excluir</button>' : '';
  openModal(editing ? 'Editar post' : 'Novo post', ic('calendar'), body, function () {
@@ -802,7 +805,7 @@ function openPostModal(post, defaults) {
    responsible_id: $('#pResp').value || null,
    funnel_stage: cur.funnel_stage, post_type: cur.post_type, channel: cur.channel,
    status: $('#pStatus').value, pub_date: $('#pDate').value || null, due_date: $('#pDue').value || null, pub_time: $('#pTime').value || null,
-   notes: $('#pNotes').value
+   notes: $('#pNotes').value, caption: $('#pCaption').value, media: media
   };
   if (!payload.title) { toast('Informe o título', 'err'); return false; }
   var op = editing ? S.updatePost(post.id, payload) : S.createPost(payload);
@@ -815,6 +818,27 @@ function openPostModal(post, defaults) {
   var name = sg.getAttribute('data-seg');
   $$('button', sg).forEach(function (b) { b.onclick = function () { cur[name] = b.getAttribute('data-v'); $$('button', sg).forEach(function (x) { x.classList.remove('on'); }); b.classList.add('on'); }; });
  });
+ // anexos (upload direto para o Vercel Blob)
+ function renderAtt() {
+  var box = $('#attList'); if (!box) return;
+  box.innerHTML = media.length ? media.map(function (m, i) {
+   var thumb = (m.type || '').indexOf('video') === 0 ? '<span class="att-thumb vid">' + ic('grid', 16) + '</span>' : '<span class="att-thumb" style="background-image:url(' + JSON.stringify(m.url) + ')"></span>';
+   return '<div class="att">' + thumb + '<span class="att-n">' + esc(m.name || 'arquivo') + '</span><button type="button" class="iconbtn" data-attdel="' + i + '">' + ic('x', 14) + '</button></div>';
+  }).join('') : '<div class="att-empty">Nenhum anexo.</div>';
+  $$('[data-attdel]', box).forEach(function (b) { b.onclick = function () { media.splice(+b.getAttribute('data-attdel'), 1); renderAtt(); }; });
+ }
+ renderAtt();
+ var fileInput = $('#attFile');
+ if (fileInput) fileInput.onchange = function () {
+  var f = this.files && this.files[0]; if (!f) return;
+  this.value = '';
+  toast('Enviando anexo…');
+  import('https://esm.sh/@vercel/blob@2.4.0/client').then(function (mod) {
+   return mod.upload('posts/' + Date.now() + '-' + f.name.replace(/[^\w.\-]+/g, '_'), f, { access: 'public', handleUploadUrl: '/api/posts?action=upload', clientPayload: st.token });
+  }).then(function (blob) {
+   media.push({ url: blob.url, type: f.type, name: f.name }); renderAtt(); toast('Anexo adicionado');
+  }).catch(function (e) { toast('Falha no upload: ' + (e.message || e), 'err'); });
+ };
  if (editing) $('#pDel').onclick = function () {
   if (!confirm('Excluir este post?')) return;
   S.deletePost(post.id).then(function () { toast('Post excluído'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });

@@ -47,6 +47,9 @@ create table if not exists posts (
   due_date date,
   pub_time text check (pub_time in ('12:00','18:00')),
   responsible_id uuid references users(id) on delete set null,
+  reject_reason text,
+  caption text,
+  media jsonb not null default '[]',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

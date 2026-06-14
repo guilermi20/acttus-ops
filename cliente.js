@@ -8,6 +8,14 @@
   var STATUS_COLOR = { 'Agendado': 'gray', 'Em produção': 'blue', 'Aguardando aprovação': 'amber', 'Modificação': 'red', 'Finalizado': 'purple', 'Postado': 'green' };
   var TYPE = { carrossel: 'Carrossel', reels: 'Reels', estatico: 'Estático' };
   function badge(t, c) { return '<span class="bg c-' + (c || 'gray') + '"><span class="bgdot"></span>' + esc(t) + '</span>'; }
+  function mediaHTML(p) {
+    var m = (p.media || []);
+    var thumbs = m.map(function (a) {
+      if ((a.type || '').indexOf('video') === 0) return '<video class="pp-media" src="' + esc(a.url) + '" controls preload="metadata"></video>';
+      return '<img class="pp-media" src="' + esc(a.url) + '" alt="" loading="lazy">';
+    }).join('');
+    return (thumbs ? '<div class="pp-medias">' + thumbs + '</div>' : '') + (p.caption ? '<div class="pp-cap">' + esc(p.caption) + '</div>' : '');
+  }
   var _t; function toast(t, k) { var e = $('#toast'); e.className = 'toast show' + (k ? ' ' + k : ''); e.textContent = t; clearTimeout(_t); _t = setTimeout(function () { e.className = 'toast'; }, 3200); }
 
   var token = new URLSearchParams(location.search).get('t');
@@ -26,13 +34,13 @@
     var dates = Object.keys(byDate).sort();
     var list = dates.length ? dates.map(function (d) {
       return '<div class="pub-day"><div class="pub-date">' + fmtDay(d) + '</div>' + byDate[d].map(function (p) {
-        return '<div class="pub-post"><div class="pp-l"><div class="pp-t">' + esc(p.title) + '</div><div class="pp-m">' + (p.pub_time ? p.pub_time + ' · ' : '') + (TYPE[p.post_type] || p.post_type) + '</div></div>' + badge(p.status, STATUS_COLOR[p.status]) + '</div>';
+        return '<div class="pub-post"><div class="pp-head"><div class="pp-l"><div class="pp-t">' + esc(p.title) + '</div><div class="pp-m">' + (p.pub_time ? p.pub_time + ' · ' : '') + (TYPE[p.post_type] || p.post_type) + '</div></div>' + badge(p.status, STATUS_COLOR[p.status]) + '</div>' + mediaHTML(p) + '</div>';
       }).join('') + '</div>';
     }).join('') : '<div class="empty">Nenhuma publicação planejada para este mês ainda.</div>';
     var pend = posts.filter(function (p) { return p.status === 'Aguardando aprovação' && p.id; });
     var approval = pend.length ? '<div class="pub-section pub-approve"><h2>⏳ Aguardando sua aprovação (' + pend.length + ')</h2>' +
       pend.map(function (p) {
-        return '<div class="pub-post approve" data-rev="' + p.id + '"><div class="pp-l"><div class="pp-t">' + esc(p.title) + '</div><div class="pp-m">' + (p.pub_date ? fmtDay(p.pub_date) + ' · ' : '') + (p.pub_time ? p.pub_time + ' · ' : '') + (TYPE[p.post_type] || p.post_type) + '</div></div><span class="btn sm pri">Revisar</span></div>';
+        return '<div class="pub-post approve" data-rev="' + p.id + '"><div class="pp-head"><div class="pp-l"><div class="pp-t">' + esc(p.title) + '</div><div class="pp-m">' + (p.pub_date ? fmtDay(p.pub_date) + ' · ' : '') + (p.pub_time ? p.pub_time + ' · ' : '') + (TYPE[p.post_type] || p.post_type) + '</div></div><span class="btn sm pri">Revisar</span></div></div>';
       }).join('') + '</div>' : '';
     pub.innerHTML =
       '<div class="pub-cover"' + cover + '><div class="pub-cover-sh"></div></div>' +
@@ -50,7 +58,7 @@
   function openReview(post) {
     $('#mboxc').innerHTML =
       '<div class="mhd"><span class="mic">👀</span><h3>Revisar publicação</h3><button class="mx" id="mx" type="button">✕</button></div>' +
-      '<div class="mbd"><div class="rev-title">' + esc(post.title) + '</div><div class="rev-meta">' + (post.pub_date ? fmtDay(post.pub_date) : '') + (post.pub_time ? ' · ' + post.pub_time : '') + ' · ' + (TYPE[post.post_type] || post.post_type) + '</div>' +
+      '<div class="mbd"><div class="rev-title">' + esc(post.title) + '</div><div class="rev-meta">' + (post.pub_date ? fmtDay(post.pub_date) : '') + (post.pub_time ? ' · ' + post.pub_time : '') + ' · ' + (TYPE[post.post_type] || post.post_type) + '</div>' + mediaHTML(post) +
         '<div id="rejWrap" style="display:none;margin-top:14px"><label class="fld"><span>Motivo da reprovação</span><textarea id="rejReason" rows="4" placeholder="Explique o que precisa mudar…"></textarea></label></div></div>' +
       '<div class="mft"><button type="button" class="btn danger" id="btnReject">❌ Reprovar</button><div class="mft-r"><button type="button" class="btn" id="btnCancel">Cancelar</button><button type="button" class="btn pri" id="btnApprove">✅ Aprovar</button></div></div>';
     $('#modal').classList.add('show');

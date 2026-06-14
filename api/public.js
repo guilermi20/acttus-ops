@@ -15,11 +15,13 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const p = await sql(`select id, to_char(pub_date,'YYYY-MM-DD') as pub_date, pub_time, title, post_type, funnel_stage, status, caption, media
         from posts
-        where client_id = $1 and pub_date is not null and pub_date >= date_trunc('month', current_date)
-        order by pub_date, pub_time`, [client.id]);
+        where client_id = $1
+        order by pub_date nulls last, pub_time nulls last, created_at`, [client.id]);
+      const nowRows = await sql('select now() as now');
       return res.status(200).json({
         client: { name: client.name, cover_url: client.cover_url, avatar_url: client.avatar_url, is_internal: client.is_internal },
         posts: p.rows,
+        now: nowRows.rows[0].now,
       });
     }
 

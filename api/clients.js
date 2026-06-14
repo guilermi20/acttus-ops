@@ -1,27 +1,44 @@
 import { sql, requireAuth } from '../lib/db.js';
+import { sendGroup } from '../lib/whatsapp.js';
 import crypto from 'node:crypto';
 
 const COLS = 'id, name, is_internal, share_token, cover_url, avatar_url, planned_months';
 
-// Marca/desmarca um mês (YYYY-MM) como planejado para o cliente.
-async function togglePlan(req, res) {
+function monthLabel(ym) {
+  const M = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  const p = String(ym).split('-');
+  return (M[+p[1] - 1] || p[1]) + ' ' + p[0];
+}
+
+// Marca/desmarca um mês (YYYY-MM) como planejado. Ao MARCAR, avisa o grupo.
+async function togglePlan(req, res, uid) {
   const id = (req.query && req.query.id) || (req.body && req.body.id);
   const ym = req.body && req.body.ym;
   if (!id || !ym) return res.status(400).json({ error: 'id e ym são obrigatórios' });
-  const cur = await sql('select planned_months from clients where id = $1', [id]);
+  const cur = await sql('select name, planned_months from clients where id = $1', [id]);
   if (!cur.rows.length) return res.status(404).json({ error: 'Cliente não encontrado' });
-  let arr = cur.rows[0].planned_months;
+  const client = cur.rows[0];
+  let arr = client.planned_months;
   if (!Array.isArray(arr)) arr = [];
-  arr = arr.indexOf(ym) >= 0 ? arr.filter((x) => x !== ym) : arr.concat([ym]);
+  const nowPlanned = arr.indexOf(ym) < 0; // não estava marcado → vai marcar
+  arr = nowPlanned ? arr.concat([ym]) : arr.filter((x) => x !== ym);
   await sql('update clients set planned_months = $1::jsonb where id = $2', [JSON.stringify(arr), id]);
+  if (nowPlanned) {
+    let who = '';
+    try { const u = await sql('select name from users where id = $1', [uid]); who = u.rows[0] ? u.rows[0].name : ''; } catch (e) {}
+    const msg = '📅 *Calendário planejado* — ' + client.name + '\nMês: ' + monthLabel(ym) + (who ? '\nMarcado por: ' + who : '');
+    try { await sendGroup(msg); } catch (e) {}
+    try { await sql('insert into notifications (text, kind) values ($1, $2)', ['Calendário de ' + monthLabel(ym) + ' (' + client.name + ') marcado como planejado', 'plan']); } catch (e) {}
+  }
   const { rows } = await sql('select ' + COLS + ' from clients where id = $1', [id]);
   return res.status(200).json(rows[0]);
 }
 
 export default async function handler(req, res) {
-  if (!requireAuth(req, res)) return;
+  const uid = requireAuth(req, res);
+  if (!uid) return;
   try {
-    if (req.query && req.query.entity === 'plan') return await togglePlan(req, res);
+    if (req.query && req.query.entity === 'plan') return await togglePlan(req, res, uid);
     if (req.method === 'GET') {
       const { rows } = await sql('select ' + COLS + ' from clients order by is_internal desc, name');
       return res.status(200).json(rows);

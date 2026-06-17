@@ -30,7 +30,9 @@ var ICONS = {
  chart:'<line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>',
  link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
  moon:'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
- sun:'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>'
+ sun:'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
+ eye:'<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+ send:'<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>'
 };
 function ic(n, s) { return '<svg class="i" width="' + (s || 18) + '" height="' + (s || 18) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[n] || ICONS.dot) + '</svg>'; }
 
@@ -49,6 +51,8 @@ function toast(t, kind) { var e = $('#toast'); e.className = 'toast show' + (kin
 /* ---------- constantes do domínio ---------- */
 var STATUS = ['Agendado', 'Em produção', 'Aguardando aprovação', 'Modificação', 'Finalizado', 'Postado'];
 var STATUS_COLOR = { 'Agendado': 'gray', 'Em produção': 'blue', 'Aguardando aprovação': 'amber', 'Modificação': 'red', 'Finalizado': 'purple', 'Postado': 'green' };
+var STATUS_ICON = { 'Agendado': 'clock', 'Em produção': 'edit', 'Aguardando aprovação': 'eye', 'Modificação': 'alert', 'Finalizado': 'check', 'Postado': 'send' };
+function statusIcon(s, size) { return ic(STATUS_ICON[s] || 'dot', size || 13); }
 var FUNNEL = [
  { key: 'topo', label: 'Topo de funil', short: 'Topo', target: 50, color: 'blue' },
  { key: 'meio', label: 'Meio de funil', short: 'Meio', target: 30, color: 'amber' },
@@ -220,7 +224,7 @@ function renderFunil(el) {
 /* ===================================================================
    CALENDÁRIO unificado
    =================================================================== */
-var calY, calM, calClient = '', calDragId = null;
+var calY, calM, calClient = '', calDragId = null, calExpanded = {};
 function calInit() { if (calY == null) { var t = todayISO().split('-'); calY = +t[0]; calM = +t[1] - 1; } }
 // Monta a grade do mês (barra + dias) para uma lista de posts já filtrada.
 function calGridHTML(posts) {
@@ -235,23 +239,28 @@ function calGridHTML(posts) {
  var cells = '';
  for (var i = 0; i < startW; i++) cells += '<div class="cal-cell out"></div>';
  var todays = todayISO();
+ var MAXEV = 4;
  for (var d = 1; d <= days; d++) {
   var iso = calY + '-' + String(calM + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-  var list = byDay[d] || [];
+  var full = byDay[d] || [];
+  var list = calExpanded[iso] ? full : full.slice(0, MAXEV);
+  var hidden = full.length - list.length;
   var evs = list.map(function (p) {
-   return '<div class="cal-ev c-' + postColor(p) + '" draggable="true" data-post="' + p.id + '" title="' + esc(p.title + ' — ' + (p.client_name || 'Sem cliente') + ' — ' + typeLabel(p.post_type)) + '">' +
-    '<div class="ce-t">' + (p.pub_time ? '<b>' + p.pub_time + '</b> ' : '') + esc(p.title) + '</div>' +
+   return '<div class="cal-ev c-' + (STATUS_COLOR[p.status] || 'gray') + '" draggable="true" data-post="' + p.id + '" title="' + esc(p.title + ' — ' + (p.client_name || 'Sem cliente') + ' — ' + typeLabel(p.post_type) + ' — ' + p.status) + '">' +
+    '<div class="ce-t"><span class="ce-st">' + statusIcon(p.status) + '</span>' + (p.pub_time ? '<b>' + p.pub_time + '</b> ' : '') + esc(p.title) + '</div>' +
     '<div class="ce-m">' + esc(p.client_name || 'Sem cliente') + ' · ' + typeLabel(p.post_type) + '</div></div>';
   }).join('');
+  var more = hidden > 0 ? '<button class="cal-more" data-more="' + iso + '">+' + hidden + ' mais</button>'
+   : (calExpanded[iso] && full.length > MAXEV ? '<button class="cal-more" data-more="' + iso + '">menos</button>' : '');
   cells += '<div class="cal-cell' + (iso === todays ? ' today' : '') + '" data-day="' + iso + '">' +
    '<div class="cal-h"><span class="cal-d">' + d + '</span><button class="cal-add" data-add="' + iso + '">+</button></div>' +
-   '<div class="cal-evs">' + evs + '</div></div>';
+   '<div class="cal-evs">' + evs + '</div>' + more + '</div>';
  }
  return '<div class="cal-bar"><button class="btn icon" id="calPrev">' + ic('left') + '</button>' +
   '<div class="cal-title">' + MONFULL[calM] + ' ' + calY + '</div>' +
   '<button class="btn icon" id="calNext">' + ic('right') + '</button>' +
   '<button class="btn sm" id="calToday">Hoje</button>' +
-  '<span class="cal-legend"><span class="cdot c-yellow"></span>Acttus &nbsp;<span class="cdot c-pink"></span>Clientes</span></div>' +
+  '<span class="cal-legend">' + STATUS.map(function (s) { return '<span class="cal-leg-item c-' + STATUS_COLOR[s] + '">' + statusIcon(s) + esc(s) + '</span>'; }).join('') + '</span></div>' +
   '<div class="cal-grid head">' + WD.map(function (w) { return '<div class="cal-wd">' + w + '</div>'; }).join('') + '</div>' +
   '<div class="cal-grid">' + cells + '</div>';
 }
@@ -275,6 +284,7 @@ function bindCal(el, rerender, addClientId) {
    S.updatePost(id, { pub_date: day }).then(function () { toast('Publicação movida para ' + fmtDay(day)); }).catch(function (er) { toast(er.message, 'err'); });
   };
  });
+ $$('[data-more]', el).forEach(function (e) { e.onclick = function (ev) { ev.stopPropagation(); var iso = e.getAttribute('data-more'); calExpanded[iso] = !calExpanded[iso]; rerender(); }; });
  $$('[data-add]', el).forEach(function (e) { e.onclick = function (ev) { ev.stopPropagation(); openPostModal(null, { pub_date: e.getAttribute('data-add'), client_id: addClientId || '' }); }; });
 }
 function renderCalendario(el) {
@@ -324,7 +334,7 @@ function renderCliente(el) {
 /* ===================================================================
    POSTS — board com os 6 status (drag & drop)
    =================================================================== */
-var boardCli = '', boardFunnel = '';
+var boardCli = '', boardFunnel = '', boardResp = '';
 var dragId = null;
 // Colunas de status para um conjunto de posts (reutilizado em Posts, Minhas demandas e Cliente).
 function statusColumns(posts) {
@@ -355,19 +365,24 @@ function renderPosts(el) {
  var posts = st.posts.filter(function (p) {
   if (boardCli && p.client_id !== boardCli) return false;
   if (boardFunnel && p.funnel_stage !== boardFunnel) return false;
+  if (boardResp === 'none') { if (p.responsible_id) return false; }
+  else if (boardResp && p.responsible_id !== boardResp) return false;
   return true;
  });
  var clientOpts = '<option value="">Todos os clientes</option>' + st.clients.map(function (c) { return '<option value="' + c.id + '"' + (c.id === boardCli ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('');
  var funnelOpts = '<option value="">Todo o funil</option>' + FUNNEL.map(function (f) { return '<option value="' + f.key + '"' + (f.key === boardFunnel ? ' selected' : '') + '>' + f.label + '</option>'; }).join('');
+ var respOpts = '<option value="">Todos os responsáveis</option>' + (st.users || []).map(function (u) { return '<option value="' + u.id + '"' + (u.id === boardResp ? ' selected' : '') + '>' + esc(u.name) + '</option>'; }).join('') + '<option value="none"' + (boardResp === 'none' ? ' selected' : '') + '>Sem responsável</option>';
 
  el.innerHTML = head('Posts', 'Arraste os cards entre as colunas — a mudança de status é avisada no grupo do WhatsApp.',
   '<select class="select" id="bCli">' + clientOpts + '</select>' +
   '<select class="select" id="bFun">' + funnelOpts + '</select>' +
+  '<select class="select" id="bResp">' + respOpts + '</select>' +
   '<button class="btn pri" data-new="1">' + ic('plus') + ' Novo post</button>') +
   '<div class="board">' + statusColumns(posts) + '</div>';
 
  $('#bCli', el).onchange = function () { boardCli = this.value; renderPosts(el); };
  $('#bFun', el).onchange = function () { boardFunnel = this.value; renderPosts(el); };
+ $('#bResp', el).onchange = function () { boardResp = this.value; renderPosts(el); };
  bindNew(el); bindBoard(el);
 }
 // Linha de demanda priorizada (mostra o prazo de CONCLUSÃO).

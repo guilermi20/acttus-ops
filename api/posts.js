@@ -1,5 +1,5 @@
 import { sql, requireAuth, verifyToken } from '../lib/db.js';
-import { sendText } from '../lib/whatsapp.js';
+import { sendGroup, sendDM } from '../lib/whatsapp.js';
 import { del } from '@vercel/blob';
 import { handleUpload } from '@vercel/blob/client';
 
@@ -109,9 +109,23 @@ export default async function handler(req, res) {
       const post = full[0];
       // mudou de coluna → avisa no grupo do WhatsApp (não falha o update se a Evolution cair)
       if (o.status && prevStatus && prevStatus !== o.status) {
-        const msg = '🔄 *Acttus OS — mudança de status*\n*' + post.title + '* — ' + (post.client_name || 'sem cliente') +
-          '\n' + prevStatus + ' → *' + post.status + '*' + (post.responsible_name ? '\nResponsável: ' + post.responsible_name : '');
-        try { await sendText(msg); } catch (e) { /* ignora falha de envio */ }
+        const base = 'https://' + (req.headers['x-forwarded-host'] || req.headers.host || 'acttus-ops.vercel.app');
+        if (o.status === 'Aguardando aprovação' && post.client_id) {
+          let link = '';
+          try { const ct = await sql('select share_token from clients where id = $1', [post.client_id]); const tk = ct.rows[0] && ct.rows[0].share_token; if (tk) link = base + '/cliente?t=' + tk + '&p=' + id; } catch (e) {}
+          const msg = '🟠 *Aprovação pendente* — ' + (post.client_name || 'sem cliente') + '\n*' + post.title + '*' + (post.responsible_name ? '\nResp: ' + post.responsible_name : '') + (link ? '\n\n👉 Abrir para aprovar:\n' + link : '');
+          try { await sendGroup(msg); } catch (e) {}
+        } else if (o.status === 'Postado') {
+          try { await sendGroup('📣 *Publicado* — ' + (post.client_name || 'sem cliente') + '\n*' + post.title + '*'); } catch (e) {}
+          try {
+            const bg = await sql("select phone from users where lower(email) = 'bigode@acttus.com' or lower(name) = 'bigode' limit 1");
+            const phone = bg.rows[0] && bg.rows[0].phone;
+            if (phone) await sendDM(phone, 'Acabamos de postar o ' + (post.post_type === 'reels' ? 'reels' : 'post') + ' de hoje: ' + post.title + (post.caption ? '\n\n📝 Legenda sugerida:\n' + post.caption : ''));
+          } catch (e) {}
+        } else {
+          const msg = '🔄 *Acttus OS — mudança de status*\n*' + post.title + '* — ' + (post.client_name || 'sem cliente') + '\n' + prevStatus + ' → *' + post.status + '*' + (post.responsible_name ? '\nResponsável: ' + post.responsible_name : '');
+          try { await sendGroup(msg); } catch (e) {}
+        }
         try { await sql('insert into notifications (text, kind, link_post_id, whatsapp_sent) values ($1, $2, $3, $4)', ['"' + post.title + '": ' + prevStatus + ' → ' + post.status, 'status', id, true]); } catch (e) {}
       }
       return res.status(200).json(post);

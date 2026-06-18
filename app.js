@@ -29,6 +29,7 @@ var ICONS = {
  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
  chart:'<line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>',
  link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+ search:'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
  moon:'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
  sun:'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
  eye:'<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
@@ -579,14 +580,17 @@ function openUserModal(user) {
    var op = editing ? S.updateUser(user.id, payload) : S.createUser(payload);
    op.then(function () { toast(editing ? 'Usuário atualizado' : 'Usuário criado'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
    return false;
-  }, editing ? 'Salvar' : 'Criar usuário');
+  }, editing ? 'Salvar' : 'Criar usuário', (editing && user.id !== (st.user && st.user.id)) ? '<button class="btn danger" id="uDel">' + ic('trash', 15) + ' Excluir</button>' : '');
+ if (editing) { var ud = $('#uDel'); if (ud) ud.onclick = function () { if (!confirm('Excluir este usuário? As rotinas dele também serão removidas.')) return; S.deleteUser(user.id).then(function () { toast('Usuário excluído'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); }); }; }
 }
 
 /* ===================================================================
    REUNIÕES (anotações estilo Notion)
    =================================================================== */
+var reuniaoSearch = '';
 function renderReunioes(el) {
- var cards = st.meetings.map(function (m) {
+ var q = reuniaoSearch.trim().toLowerCase();
+ var cards = st.meetings.filter(function (m) { return !q || ((m.title || '') + ' ' + (m.category || '') + ' ' + (m.notes || '')).toLowerCase().indexOf(q) >= 0; }).map(function (m) {
   var parts = (m.participants || []).map(function (id) { var u = userById(id); return u ? u.name : null; }).filter(Boolean);
   return '<div class="mtcard" data-meet="' + m.id + '">' +
    '<div class="mtcard-h"><h4>' + esc(m.title) + '</h4>' + (m.category ? '<span class="bg c-blue">' + esc(m.category) + '</span>' : '') + '</div>' +
@@ -594,11 +598,13 @@ function renderReunioes(el) {
    '<div class="mtcard-notes' + (m.notes ? '' : ' empty-notes') + '">' + (m.notes ? esc(m.notes.slice(0, 240)) + (m.notes.length > 240 ? '…' : '') : 'Sem anotações ainda.') + '</div>' +
    '</div>';
  }).join('') || '<div class="empty">Nenhuma reunião registrada. Clique em "Nova pauta" para começar.</div>';
- el.innerHTML = head('Reuniões', 'Anotações de pautas e assuntos discutidos — simples como um bloco de notas.',
+ el.innerHTML = head('Reuniões', 'Anotações de pautas e assuntos discutidos.',
   '<button class="btn pri" id="newMeet">' + ic('plus') + ' Nova pauta</button>') +
+  '<div class="searchbar">' + ic('search', 16) + '<input id="meetSearch" placeholder="Buscar reuniões…" value="' + esc(reuniaoSearch) + '"></div>' +
   '<div class="mtgrid">' + cards + '</div>';
  $('#newMeet', el).onclick = function () { openMeetingModal(null); };
  $$('[data-meet]', el).forEach(function (c) { c.onclick = function () { openReuniao(c.getAttribute('data-meet')); }; });
+ var si = $('#meetSearch', el); if (si) si.oninput = function () { reuniaoSearch = this.value; renderReunioes(el); var n = $('#meetSearch', el); if (n) { n.focus(); var v = n.value; n.value = ''; n.value = v; } };
 }
 var reuniaoId = '';
 function openReuniao(id) { reuniaoId = id; route = 'reuniao'; renderNav(); renderView(); var sc = document.querySelector('.scroll'); if (sc) sc.scrollTop = 0; }
@@ -645,8 +651,10 @@ function openMeetingModal(meet) {
 var PT_STATUS = ['A fazer', 'Em andamento', 'Concluída'];
 var projetoId = '';
 function projStatusColor(s) { return s === 'Concluído' ? 'green' : s === 'Pausado' ? 'amber' : 'blue'; }
+var projetoSearch = '';
 function renderProjetos(el) {
- var cards = st.projects.map(function (p) {
+ var q = projetoSearch.trim().toLowerCase();
+ var cards = st.projects.filter(function (p) { return !q || ((p.name || '') + ' ' + (p.description || '')).toLowerCase().indexOf(q) >= 0; }).map(function (p) {
   return '<div class="card" data-proj="' + p.id + '"><div class="ct">' + ic('folder', 20) + '</div>' +
    '<h4>' + esc(p.name) + '</h4>' + (p.description ? '<div class="m">' + esc(p.description) + '</div>' : '<div class="m"></div>') +
    '<div class="ft"><span class="bg c-' + projStatusColor(p.status) + '">' + esc(p.status) + '</span>' +
@@ -655,9 +663,11 @@ function renderProjetos(el) {
  }).join('') || '<div class="empty">Nenhum projeto ainda. Crie o primeiro.</div>';
  el.innerHTML = head('Projetos', 'Projetos internos da Acttus. Clique para abrir e gerenciar as tarefas.',
   '<button class="btn pri" id="newProj">' + ic('plus') + ' Novo projeto</button>') +
+  '<div class="searchbar">' + ic('search', 16) + '<input id="projSearch" placeholder="Buscar projetos…" value="' + esc(projetoSearch) + '"></div>' +
   '<div class="cards">' + cards + '</div>';
  $('#newProj', el).onclick = function () { openProjectModal(null); };
  $$('[data-proj]', el).forEach(function (c) { c.onclick = function () { openProjeto(c.getAttribute('data-proj')); }; });
+ var si = $('#projSearch', el); if (si) si.oninput = function () { projetoSearch = this.value; renderProjetos(el); var n = $('#projSearch', el); if (n) { n.focus(); var v = n.value; n.value = ''; n.value = v; } };
 }
 function openProjeto(id) { projetoId = id; route = 'projeto'; renderNav(); renderView(); var sc = document.querySelector('.scroll'); if (sc) sc.scrollTop = 0; }
 function renderProjeto(el) {
@@ -776,9 +786,11 @@ function renderDashboards(el) {
    BANCO DE IDEIAS
    =================================================================== */
 function ideaById(id) { for (var i = 0; i < st.ideas.length; i++) if (st.ideas[i].id === id) return st.ideas[i]; return null; }
+var ideaSearch = '', ideaClient = '';
 function renderIdeias(el) {
  var sc = { nova: 'amber', usada: 'green', descartada: 'gray', aprovada: 'blue' };
- var rows = st.ideas.map(function (i) {
+ var q = ideaSearch.trim().toLowerCase();
+ var rows = st.ideas.filter(function (i) { if (ideaClient && i.client_id !== ideaClient) return false; return !q || ((i.title || '') + ' ' + (i.notes || '') + ' ' + (i.client_name || '')).toLowerCase().indexOf(q) >= 0; }).map(function (i) {
   return '<div class="idea"><div class="idea-top"><span class="cdot c-' + (i.is_internal ? 'yellow' : (i.client_id ? 'pink' : 'gray')) + '"></span><b>' + esc(i.client_name || 'Sem cliente') + '</b><span class="bg c-' + (sc[i.status] || 'gray') + '" style="margin-left:auto">' + esc(i.status) + '</span></div>' +
    '<div class="idea-t">' + esc(i.title) + '</div>' + (i.notes ? '<div class="idea-n">' + esc(i.notes) + '</div>' : '') +
    '<div class="idea-ft"><span class="sub">' + (i.source === 'painel' ? '💡 sugerida pelo cliente' : 'interna') + '</span><span class="sp"></span>' +
@@ -786,9 +798,13 @@ function renderIdeias(el) {
     (i.status === 'descartada' ? '' : '<button class="btn sm" data-idiscard="' + i.id + '">Descartar</button>') +
     '<button class="iconbtn" data-idel="' + i.id + '" title="Excluir">' + ic('trash', 14) + '</button></div></div>';
  }).join('') || '<div class="empty">Nenhuma ideia ainda. As sugestões dos clientes (pelo painel) e as ideias internas aparecem aqui.</div>';
+ var cliOpts = '<option value="">Todos os clientes</option>' + st.clients.map(function (c) { return '<option value="' + c.id + '"' + (c.id === ideaClient ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('');
  el.innerHTML = head('Banco de ideias', 'Sugestões de todos os clientes, unificadas. Reaproveite qualquer ideia em qualquer calendário.',
   '<button class="btn pri" id="newIdea">' + ic('plus') + ' Nova ideia</button>') +
+  '<div class="filterbar"><div class="searchbar">' + ic('search', 16) + '<input id="ideaSearch" placeholder="Buscar ideias…" value="' + esc(ideaSearch) + '"></div><select class="select" id="ideaCli">' + cliOpts + '</select></div>' +
   '<div class="ideas">' + rows + '</div>';
+ var ss = $('#ideaSearch', el); if (ss) ss.oninput = function () { ideaSearch = this.value; renderIdeias(el); var n = $('#ideaSearch', el); if (n) { n.focus(); var v = n.value; n.value = ''; n.value = v; } };
+ var cf = $('#ideaCli', el); if (cf) cf.onchange = function () { ideaClient = this.value; renderIdeias(el); };
  $('#newIdea', el).onclick = function () { openIdeaModal(); };
  $$('[data-ireuse]', el).forEach(function (b) { b.onclick = function () { var i = ideaById(b.getAttribute('data-ireuse')); if (i) reuseIdea(i); }; });
  $$('[data-idiscard]', el).forEach(function (b) { b.onclick = function () { S.updateIdea(b.getAttribute('data-idiscard'), { status: 'descartada' }).then(function () { toast('Ideia descartada'); }).catch(function (e) { toast(e.message, 'err'); }); }; });

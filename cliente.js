@@ -147,8 +147,15 @@
     if (!token) { render(); return; }
     fetch('/api/public?t=' + encodeURIComponent(token))
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-      .then(function (o) { if (!o.ok) throw new Error((o.j && o.j.error) || 'Erro'); data = o.j; render(); })
+      .then(function (o) { if (!o.ok) throw new Error((o.j && o.j.error) || 'Erro'); data = o.j; render(); maybeDeepLink(); })
       .catch(function (e) { $('#pub').innerHTML = '<div class="puberr">' + esc(e.message || 'Não foi possível carregar o painel.') + '</div>'; });
+  }
+  var deepDone = false;
+  function maybeDeepLink() {
+    if (deepDone) return;
+    var pid = new URLSearchParams(location.search).get('p'); if (!pid) return;
+    deepDone = true;
+    var p = postById(pid); if (p) openDetail(p);
   }
   load();
 })();

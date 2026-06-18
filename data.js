@@ -109,6 +109,7 @@
   function deleteIdea(id) { return req('DELETE', '/api/ideas?id=' + encodeURIComponent(id)).then(function () { state.ideas = state.ideas.filter(function (x) { return x.id !== id; }); emit(); }); }
   function createUser(b) { return req('POST', '/api/users', b).then(function (u) { state.users.push(u); state.users.sort(function (a, b) { return a.name.localeCompare(b.name); }); emit(); return u; }); }
   function updateUser(id, b) { return req('PATCH', '/api/users?id=' + encodeURIComponent(id), b).then(function (u) { var i = -1; for (var k = 0; k < state.users.length; k++) if (state.users[k].id === id) { i = k; break; } if (i >= 0) state.users[i] = u; state.users.sort(function (a, b) { return a.name.localeCompare(b.name); }); if (state.user && state.user.id === id) { state.user = { id: u.id, name: u.name, email: u.email, role: u.role || state.user.role }; localStorage.setItem(USER_KEY, JSON.stringify(state.user)); } emit(); return u; }); }
+  function deleteUser(id) { return req('DELETE', '/api/users?id=' + encodeURIComponent(id)).then(function () { state.users = state.users.filter(function (u) { return u.id !== id; }); emit(); }); }
   function markNotifsRead() { return req('PATCH', '/api/notifications').then(function () { var now = new Date().toISOString(); state.notifications.forEach(function (n) { if (!n.read_at) n.read_at = now; }); emit(); }); }
   function upsert(arr, item) { var i = -1; for (var k = 0; k < arr.length; k++) if (arr[k].id === item.id) { i = k; break; } if (i >= 0) arr[i] = item; else arr.unshift(item); }
   function createRoutine(b) { return req('POST', '/api/routines', b).then(function (x) { state.routines.unshift(x); emit(); return x; }); }
@@ -138,7 +139,7 @@
     login: login, logout: function () { doLogout(); emit(); },
     loadAll: loadAll, refreshPosts: refreshPosts, refreshNotifs: refreshNotifs,
     createPost: createPost, updatePost: updatePost, deletePost: deletePost,
-    createClient: createClient, updateClient: updateClient, togglePlan: togglePlan, createUser: createUser, updateUser: updateUser, markNotifsRead: markNotifsRead,
+    createClient: createClient, updateClient: updateClient, togglePlan: togglePlan, createUser: createUser, updateUser: updateUser, deleteUser: deleteUser, markNotifsRead: markNotifsRead,
     createIdea: createIdea, updateIdea: updateIdea, deleteIdea: deleteIdea,
     createMeeting: createMeeting, updateMeeting: updateMeeting, deleteMeeting: deleteMeeting,
     createRoutine: createRoutine, updateRoutine: updateRoutine, deleteRoutine: deleteRoutine,

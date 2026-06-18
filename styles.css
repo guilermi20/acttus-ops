@@ -445,6 +445,13 @@ img.pp-media.zoomable{cursor:zoom-in}
 .imgup .btn{cursor:pointer}
 .imgup-prev{width:56px;height:56px;border-radius:10px;background:var(--panel2) center/cover no-repeat;border:1px solid var(--line2);flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:var(--mut2)}
 
+/* busca + filtros */
+.searchbar{display:flex;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:9px 13px;margin-top:16px;max-width:440px}
+.searchbar .i{color:var(--mut2)}
+.searchbar input{flex:1;border:0;background:transparent;color:var(--ink);font-family:var(--f);font-size:14px;outline:none}
+.filterbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}
+.filterbar .searchbar{margin-top:0;flex:1;min-width:220px}
+
 /* drag no calendário + nota de reprovação */
 .cal-ev{cursor:grab}
 .cal-ev.dragging{opacity:.45}

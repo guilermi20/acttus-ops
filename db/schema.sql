@@ -8,6 +8,8 @@ create table if not exists clients (
   share_token text,
   cover_url text,
   avatar_url text,
+  planned_months jsonb not null default '[]',
+  metrics jsonb not null default '{}',
   created_at timestamptz not null default now()
 );
 create unique index if not exists clients_share_token_idx on clients(share_token);
@@ -50,6 +52,8 @@ create table if not exists posts (
   reject_reason text,
   caption text,
   media jsonb not null default '[]',
+  kind text not null default 'post',
+  date_moved text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -74,6 +78,7 @@ create table if not exists meetings (
   meeting_date date,
   category text not null default '',
   participants jsonb not null default '[]',
+  attachments jsonb not null default '[]',
   notes text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -98,6 +103,7 @@ create table if not exists projects (
   description text not null default '',
   responsible_id uuid references users(id) on delete set null,
   status text not null default 'Ativo',
+  attachments jsonb not null default '[]',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

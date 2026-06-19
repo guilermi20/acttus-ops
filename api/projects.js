@@ -2,8 +2,13 @@ import { sql, requireAuth } from '../lib/db.js';
 
 const P_STATUS = ['Ativo', 'Pausado', 'Concluído'];
 const T_STATUS = ['A fazer', 'Em andamento', 'Concluída'];
+function cleanAtts(a) {
+  if (!Array.isArray(a)) return [];
+  return a.filter(function (x) { return x && typeof x.url === 'string'; })
+    .map(function (x) { return { url: x.url, name: String(x.name || ''), type: String(x.type || '') }; }).slice(0, 30);
+}
 
-const PSEL = `select p.id, p.name, p.description, p.responsible_id, p.status, p.created_at, p.updated_at,
+const PSEL = `select p.id, p.name, p.description, p.responsible_id, p.status, p.attachments, p.created_at, p.updated_at,
   u.name as responsible_name,
   (select count(*)::int from project_tasks t where t.project_id = p.id) as task_count,
   (select count(*)::int from project_tasks t where t.project_id = p.id and t.status = 'Concluída') as done_count
@@ -71,8 +76,8 @@ export default async function handler(req, res) {
       const name = String(b.name || '').trim();
       if (!name) return res.status(400).json({ error: 'Nome é obrigatório' });
       const status = P_STATUS.includes(b.status) ? b.status : 'Ativo';
-      const ins = await sql`insert into projects (name, description, responsible_id, status)
-        values (${name}, ${String(b.description || '')}, ${b.responsible_id || null}, ${status}) returning id`;
+      const ins = await sql`insert into projects (name, description, responsible_id, status, attachments)
+        values (${name}, ${String(b.description || '')}, ${b.responsible_id || null}, ${status}, ${JSON.stringify(cleanAtts(b.attachments))}::jsonb) returning id`;
       const f = await sql(PSEL + ' where p.id = $1', [ins.rows[0].id]);
       return res.status(201).json(f.rows[0]);
     }
@@ -84,10 +89,11 @@ export default async function handler(req, res) {
       if ('description' in b) fld.description = String(b.description || '');
       if ('responsible_id' in b) fld.responsible_id = b.responsible_id || null;
       if ('status' in b && P_STATUS.includes(b.status)) fld.status = b.status;
+      if ('attachments' in b) fld.attachments = cleanAtts(b.attachments);
       const keys = Object.keys(fld);
       if (!keys.length) return res.status(400).json({ error: 'Nada para atualizar' });
-      const sets = keys.map((k, i) => k + ' = $' + (i + 1)).join(', ');
-      const vals = keys.map((k) => fld[k]); vals.push(id);
+      const sets = keys.map((k, i) => (k === 'attachments' ? k + ' = $' + (i + 1) + '::jsonb' : k + ' = $' + (i + 1))).join(', ');
+      const vals = keys.map((k) => (k === 'attachments' ? JSON.stringify(fld[k] || []) : fld[k])); vals.push(id);
       const upd = await sql('update projects set ' + sets + ', updated_at = now() where id = $' + vals.length + ' returning id', vals);
       if (!upd.rows.length) return res.status(404).json({ error: 'Projeto não encontrado' });
       const f = await sql(PSEL + ' where p.id = $1', [id]);

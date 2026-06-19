@@ -30,6 +30,7 @@ var ICONS = {
  chart:'<line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>',
  link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
  search:'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+ video:'<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>',
  moon:'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
  sun:'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
  eye:'<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
@@ -87,11 +88,11 @@ function avatar(name, sz) { sz = sz || 26; return '<span class="avt" title="' + 
    =================================================================== */
 var NAV = [
  { sec: 'Painel', admin: true, items: [{ key: 'dashboard', label: 'Visão geral', icon: 'dashboard' }, { key: 'funil', label: 'Funil 50/30/20', icon: 'target' }, { key: 'dashboards', label: 'Dashboards', icon: 'chart' }] },
- { sec: 'Editorial', items: [{ key: 'calendario', label: 'Calendário', icon: 'calendar' }, { key: 'posts', label: 'Posts', icon: 'grid' }, { key: 'minhas', label: 'Minhas demandas', icon: 'check' }, { key: 'rotinas', label: 'Rotinas', icon: 'clock' }, { key: 'ideias', label: 'Banco de ideias', icon: 'zap' }] },
+ { sec: 'Editorial', items: [{ key: 'calendario', label: 'Calendário', icon: 'calendar' }, { key: 'posts', label: 'Posts', icon: 'grid' }, { key: 'gravacoes', label: 'Gravações', icon: 'video' }, { key: 'minhas', label: 'Minhas demandas', icon: 'check' }, { key: 'rotinas', label: 'Rotinas', icon: 'clock' }, { key: 'ideias', label: 'Banco de ideias', icon: 'zap' }] },
  { sec: 'Operação', items: [{ key: 'projetos', label: 'Projetos', icon: 'folder' }, { key: 'reunioes', label: 'Reuniões', icon: 'book' }] },
  { sec: 'Cadastros', items: [{ key: 'clientes', label: 'Clientes', icon: 'building' }, { key: 'usuarios', label: 'Usuários', icon: 'users' }] }
 ];
-var VIEWS = { dashboard: renderDashboard, funil: renderFunil, dashboards: renderDashboards, calendario: renderCalendario, posts: renderPosts, minhas: renderMinhas, rotinas: renderRotinas, ideias: renderIdeias, projetos: renderProjetos, projeto: renderProjeto, reunioes: renderReunioes, reuniao: renderReuniao, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios };
+var VIEWS = { dashboard: renderDashboard, funil: renderFunil, dashboards: renderDashboards, calendario: renderCalendario, posts: renderPosts, gravacoes: renderGravacoes, minhas: renderMinhas, rotinas: renderRotinas, ideias: renderIdeias, projetos: renderProjetos, projeto: renderProjeto, reunioes: renderReunioes, reuniao: renderReuniao, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios };
 var ADMIN_ROUTES = { dashboard: 1, funil: 1, dashboards: 1 };
 var route = 'calendario';
 
@@ -113,7 +114,8 @@ function renderNav() {
  $$('#nav .navitem').forEach(function (n) { n.onclick = function () { go(n.getAttribute('data-go')); }; });
 }
 function navCount(k) {
- if (k === 'posts') return st.posts.length;
+ if (k === 'posts') return st.posts.filter(function (p) { return (p.kind || 'post') === 'post'; }).length;
+ if (k === 'gravacoes') return st.posts.filter(function (p) { return p.kind === 'gravacao'; }).length;
  if (k === 'minhas') return st.posts.filter(function (p) { return st.user && p.responsible_id === st.user.id; }).length;
  if (k === 'rotinas') return st.routines.filter(function (r) { return st.user && r.owner_id === st.user.id && !r.done; }).length;
  if (k === 'ideias') return st.ideas.filter(function (i) { return i.status === 'nova'; }).length;
@@ -137,7 +139,7 @@ function kpi(label, value, desc, color) {
    DASHBOARD — visão geral
    =================================================================== */
 function renderDashboard(el) {
- var posts = st.posts;
+ var posts = st.posts.filter(function (p) { return (p.kind || 'post') === 'post'; });
  var total = posts.length;
  var agendados = posts.filter(function (p) { return p.status === 'Agendado'; }).length;
  var postados = posts.filter(function (p) { return p.status === 'Postado'; }).length;
@@ -182,7 +184,7 @@ function postById(id) { for (var i = 0; i < st.posts.length; i++) if (st.posts[i
    =================================================================== */
 var funilClient = '';
 function renderFunil(el) {
- var posts = funilClient ? st.posts.filter(function (p) { return p.client_id === funilClient; }) : st.posts;
+ var posts = st.posts.filter(function (p) { return (p.kind || 'post') === 'post' && (!funilClient || p.client_id === funilClient); });
  var total = posts.length;
  var counts = { topo: 0, meio: 0, fundo: 0 };
  posts.forEach(function (p) { counts[p.funnel_stage] = (counts[p.funnel_stage] || 0) + 1; });
@@ -247,9 +249,11 @@ function calGridHTML(posts) {
   var list = calExpanded[iso] ? full : full.slice(0, MAXEV);
   var hidden = full.length - list.length;
   var evs = list.map(function (p) {
-   return '<div class="cal-ev c-' + (STATUS_COLOR[p.status] || 'gray') + '" draggable="true" data-post="' + p.id + '" title="' + esc(p.title + ' — ' + (p.client_name || 'Sem cliente') + ' — ' + typeLabel(p.post_type) + ' — ' + p.status) + '">' +
-    '<div class="ce-t"><span class="ce-st">' + statusIcon(p.status) + '</span>' + (p.pub_time ? '<b>' + p.pub_time + '</b> ' : '') + esc(p.title) + '</div>' +
-    '<div class="ce-m">' + esc(p.client_name || 'Sem cliente') + ' · ' + typeLabel(p.post_type) + '</div></div>';
+   var tlabel = p.kind === 'gravacao' ? 'Gravação' : typeLabel(p.post_type);
+   var mv = p.date_moved === 'adiado' ? '⏩ ' : (p.date_moved === 'antecipado' ? '⏪ ' : '');
+   return '<div class="cal-ev c-' + (STATUS_COLOR[p.status] || 'gray') + '" draggable="true" data-post="' + p.id + '" title="' + esc(p.title + ' — ' + (p.client_name || 'Sem cliente') + ' — ' + tlabel + ' — ' + p.status + (p.date_moved ? ' (' + p.date_moved + ')' : '')) + '">' +
+    '<div class="ce-t"><span class="ce-st">' + statusIcon(p.status) + '</span>' + (p.kind === 'gravacao' ? '🎬 ' : '') + mv + (p.pub_time ? '<b>' + p.pub_time + '</b> ' : '') + esc(p.title) + '</div>' +
+    '<div class="ce-m">' + esc(p.client_name || 'Sem cliente') + ' · ' + tlabel + '</div></div>';
   }).join('');
   var more = hidden > 0 ? '<button class="cal-more" data-more="' + iso + '">+' + hidden + ' mais</button>'
    : (calExpanded[iso] && full.length > MAXEV ? '<button class="cal-more" data-more="' + iso + '">menos</button>' : '');
@@ -364,6 +368,7 @@ function bindBoard(el) {
 }
 function renderPosts(el) {
  var posts = st.posts.filter(function (p) {
+  if ((p.kind || 'post') !== 'post') return false;
   if (boardCli && p.client_id !== boardCli) return false;
   if (boardFunnel && p.funnel_stage !== boardFunnel) return false;
   if (boardResp === 'none') { if (p.responsible_id) return false; }
@@ -385,6 +390,26 @@ function renderPosts(el) {
  $('#bFun', el).onchange = function () { boardFunnel = this.value; renderPosts(el); };
  $('#bResp', el).onchange = function () { boardResp = this.value; renderPosts(el); };
  bindNew(el); bindBoard(el);
+}
+function renderGravacoes(el) {
+ var list = st.posts.filter(function (p) {
+  if (p.kind !== 'gravacao') return false;
+  if (boardCli && p.client_id !== boardCli) return false;
+  if (boardResp === 'none') { if (p.responsible_id) return false; }
+  else if (boardResp && p.responsible_id !== boardResp) return false;
+  return true;
+ });
+ var clientOpts = '<option value="">Todos os clientes</option>' + st.clients.map(function (c) { return '<option value="' + c.id + '"' + (c.id === boardCli ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('');
+ var respOpts = '<option value="">Todos os responsáveis</option>' + (st.users || []).map(function (u) { return '<option value="' + u.id + '"' + (u.id === boardResp ? ' selected' : '') + '>' + esc(u.name) + '</option>'; }).join('');
+ el.innerHTML = head('Gravações', 'Demandas de gravação — arraste entre as colunas. Mesmas notificações das demandas.',
+  '<select class="select" id="gCli">' + clientOpts + '</select>' +
+  '<select class="select" id="gResp">' + respOpts + '</select>' +
+  '<button class="btn pri" data-newgrav="1">' + ic('plus') + ' Nova gravação</button>') +
+  '<div class="board">' + statusColumns(list) + '</div>';
+ $('#gCli', el).onchange = function () { boardCli = this.value; renderGravacoes(el); };
+ $('#gResp', el).onchange = function () { boardResp = this.value; renderGravacoes(el); };
+ $$('[data-newgrav]', el).forEach(function (b) { b.onclick = function () { openPostModal(null, { kind: 'gravacao' }); }; });
+ bindBoard(el);
 }
 // Linha de demanda priorizada (mostra o prazo de CONCLUSÃO).
 function priorityRow(p) {
@@ -411,7 +436,7 @@ function prioBucket(p, today) {
 }
 function renderMinhas(el) {
  var me = st.user || {}, today = todayISO();
- var mine = st.posts.filter(function (p) { return p.responsible_id === me.id; });
+ var mine = st.posts.filter(function (p) { return p.responsible_id === me.id && (p.kind || 'post') === 'post'; });
  var groups = [[], [], [], [], [], []];
  mine.forEach(function (p) { groups[prioBucket(p, today)].push(p); });
  groups.forEach(function (g) { g.sort(function (a, b) { return (a.due_date || '9999') < (b.due_date || '9999') ? -1 : 1; }); });
@@ -472,7 +497,7 @@ function postCard(p) {
  return '<div class="kc" draggable="true" data-id="' + p.id + '">' +
   '<div class="kc-t">' + esc(p.title) + '</div>' +
   '<div class="kc-m"><span class="cdot c-' + c + '"></span>' + esc(p.client_name || 'Sem cliente') + '</div>' +
-  '<div class="kc-tags"><span class="ptag c-' + funnelMeta(p.funnel_stage).color + '">' + funnelMeta(p.funnel_stage).short + '</span><span class="ptag">' + typeLabel(p.post_type) + '</span><span class="ptag">' + channelLabel(p.channel) + '</span></div>' +
+  '<div class="kc-tags">' + (p.kind === 'gravacao' ? '<span class="ptag c-purple">🎬 Gravação</span>' : '<span class="ptag c-' + funnelMeta(p.funnel_stage).color + '">' + funnelMeta(p.funnel_stage).short + '</span><span class="ptag">' + typeLabel(p.post_type) + '</span><span class="ptag">' + channelLabel(p.channel) + '</span>') + '</div>' +
   '<div class="kc-f">' + (isOverdue(p) ? '<span class="overdue">' + ic('alert', 13) + ' vencido</span>' : '<span class="kc-dt">' + ic('clock', 13) + ' ' + fmtDay(p.pub_date) + (p.pub_time ? ' ' + p.pub_time : '') + '</span>') + avatar(p.responsible_name, 22) + '</div></div>';
 }
 
@@ -743,7 +768,7 @@ function dashBars(pairs, colorOf) {
 function dashPanel(title, body) { return '<div class="panel"><div class="hd"><h3>' + esc(title) + '</h3></div><div class="bd">' + body + '</div></div>'; }
 function renderDashboards(el) {
  if (!isAdmin()) { go('calendario'); return; }
- var posts = st.posts, today = todayISO();
+ var posts = st.posts.filter(function (p) { return (p.kind || 'post') === 'post'; }), today = todayISO();
  var byResp = {}; posts.forEach(function (p) { var k = p.responsible_name || 'Sem responsável'; byResp[k] = (byResp[k] || 0) + 1; });
  var d1 = dashBars(Object.keys(byResp).map(function (k) { return [k, byResp[k]]; }).sort(function (a, b) { return b[1] - a[1]; }));
  var d5 = dashBars(STATUS.map(function (s) { return [s, posts.filter(function (p) { return p.status === s; }).length]; }), function (s) { return STATUS_COLOR[s]; });
@@ -838,6 +863,7 @@ function openPostModal(post, defaults) {
  var p = post || {};
  var d = defaults || {};
  var editing = !!post;
+ var isGrav = (p.kind === 'gravacao') || (d.kind === 'gravacao');
  var media = (p.media || []).slice();
  var cur = {
   client_id: p.client_id || d.client_id || (st.clients[0] && st.clients[0].id) || '',
@@ -854,12 +880,13 @@ function openPostModal(post, defaults) {
 
  var rejNote = (editing && p.reject_reason) ? '<div class="note rej">' + ic('alert', 15) + ' <span><b>Reprovado pelo cliente:</b> ' + esc(p.reject_reason) + '</span></div>' : '';
  var body = rejNote +
-  '<label class="fld"><span>Título do post</span><input id="pTitle" value="' + esc(p.title || d.title || '') + '" placeholder="Ex.: 3 dúvidas sobre..."></label>' +
+  '<label class="fld"><span>Título' + (isGrav ? ' da gravação' : ' do post') + '</span><input id="pTitle" value="' + esc(p.title || d.title || '') + '" placeholder="Ex.: ' + (isGrav ? 'Gravação institucional' : '3 dúvidas sobre...') + '"></label>' +
   '<div class="mrow2"><label class="fld"><span>Cliente</span><select id="pClient">' + (clientOpts || '<option value="">Crie um cliente antes</option>') + '</select></label>' +
   '<label class="fld"><span>Responsável</span><select id="pResp">' + userOpts + '</select></label></div>' +
-  '<div class="fld"><span>Etapa do funil</span>' + seg('funnel_stage', FUNNEL.map(function (f) { return { key: f.key, label: f.short }; }), cur.funnel_stage) + '</div>' +
-  '<div class="mrow2"><div class="fld"><span>Tipo</span>' + seg('post_type', TYPES, cur.post_type) + '</div>' +
-  '<div class="fld"><span>Canal</span>' + seg('channel', CHANNELS, cur.channel) + '</div></div>' +
+  (isGrav ? '' :
+   '<div class="fld"><span>Etapa do funil</span>' + seg('funnel_stage', FUNNEL.map(function (f) { return { key: f.key, label: f.short }; }), cur.funnel_stage) + '</div>' +
+   '<div class="mrow2"><div class="fld"><span>Tipo</span>' + seg('post_type', TYPES, cur.post_type) + '</div>' +
+   '<div class="fld"><span>Canal</span>' + seg('channel', CHANNELS, cur.channel) + '</div></div>') +
   '<div class="mrow2"><label class="fld"><span>Data de publicação</span><input type="date" id="pDate" value="' + esc(p.pub_date || d.pub_date || '') + '"></label>' +
   '<label class="fld"><span>Prazo de conclusão</span><input type="date" id="pDue" value="' + esc(p.due_date || '') + '"></label></div>' +
   '<div class="mrow2"><label class="fld"><span>Horário</span><select id="pTime">' + timeOpts + '</select></label>' +
@@ -869,20 +896,21 @@ function openPostModal(post, defaults) {
   '<div class="fld"><span>Anexos (imagem/vídeo — somem quando o post vira "Postado")</span><div class="att-list" id="attList"></div><label class="att-add">' + ic('plus', 14) + ' Adicionar arquivo<input type="file" id="attFile" accept="image/*,video/*" hidden></label></div>';
 
  var extra = editing ? '<button class="btn danger" id="pDel">' + ic('trash', 15) + ' Excluir</button>' : '';
- openModal(editing ? 'Editar post' : 'Novo post', ic('calendar'), body, function () {
+ openModal(isGrav ? (editing ? 'Editar gravação' : 'Nova gravação') : (editing ? 'Editar post' : 'Novo post'), ic(isGrav ? 'video' : 'calendar'), body, function () {
   var payload = {
    title: $('#pTitle').value.trim(),
    client_id: $('#pClient').value || null,
    responsible_id: $('#pResp').value || null,
+   kind: isGrav ? 'gravacao' : 'post',
    funnel_stage: cur.funnel_stage, post_type: cur.post_type, channel: cur.channel,
    status: $('#pStatus').value, pub_date: $('#pDate').value || null, due_date: $('#pDue').value || null, pub_time: $('#pTime').value || null,
    notes: $('#pNotes').value, caption: $('#pCaption').value, media: media
   };
   if (!payload.title) { toast('Informe o título', 'err'); return false; }
   var op = editing ? S.updatePost(post.id, payload) : S.createPost(payload);
-  op.then(function () { if (!editing && d.ideaId) { S.updateIdea(d.ideaId, { status: 'usada' }).catch(function () {}); } toast(editing ? 'Post atualizado' : 'Post criado'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
+  op.then(function () { if (!editing && d.ideaId) { S.updateIdea(d.ideaId, { status: 'usada' }).catch(function () {}); } toast(editing ? 'Salvo' : (isGrav ? 'Gravação criada' : 'Post criado')); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
   return false;
- }, editing ? 'Salvar' : 'Criar post', extra);
+ }, editing ? 'Salvar' : (isGrav ? 'Criar gravação' : 'Criar post'), extra);
 
  // segmented controls
  $$('#mboxc .seg').forEach(function (sg) {

@@ -26,13 +26,14 @@ function clean(body) {
   if ('reject_reason' in body) o.reject_reason = body.reject_reason || null;
   if ('caption' in body) o.caption = String(body.caption || '');
   if ('media' in body) o.media = Array.isArray(body.media) ? body.media.slice(0, 10) : [];
+  if ('kind' in body && (body.kind === 'post' || body.kind === 'gravacao')) o.kind = body.kind;
   return o;
 }
 
 const SELECT = `
   select p.id, p.client_id, p.title, p.funnel_stage, p.post_type, p.channel, p.status,
          p.notes, to_char(p.pub_date,'YYYY-MM-DD') as pub_date, to_char(p.due_date,'YYYY-MM-DD') as due_date, p.pub_time,
-         p.responsible_id, p.reject_reason, p.caption, p.media, p.created_at, p.updated_at,
+         p.responsible_id, p.reject_reason, p.caption, p.media, p.kind, p.date_moved, p.created_at, p.updated_at,
          c.name as client_name, c.is_internal, u.name as responsible_name
   from posts p
   left join clients c on c.id = p.client_id
@@ -47,7 +48,7 @@ async function handleBlobUpload(req, res) {
       onBeforeGenerateToken: async (pathname, clientPayload) => {
         if (!verifyToken(clientPayload)) throw new Error('Não autenticado');
         return {
-          allowedContentTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/quicktime', 'video/webm'],
+          allowedContentTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/quicktime', 'video/webm', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/zip', 'text/plain'],
           maximumSizeInBytes: 200 * 1024 * 1024,
         };
       },
@@ -77,8 +78,8 @@ export default async function handler(req, res) {
       o.channel = o.channel || 'organico';
       o.status = o.status || 'Agendado';
       const { rows } = await sql`
-        insert into posts (client_id, title, funnel_stage, post_type, channel, status, notes, pub_date, due_date, pub_time, responsible_id, caption, media)
-        values (${o.client_id}, ${o.title}, ${o.funnel_stage}, ${o.post_type}, ${o.channel}, ${o.status}, ${o.notes || ''}, ${o.pub_date}, ${o.due_date}, ${o.pub_time}, ${o.responsible_id}, ${o.caption || ''}, ${JSON.stringify(o.media || [])}::jsonb)
+        insert into posts (client_id, title, funnel_stage, post_type, channel, status, notes, pub_date, due_date, pub_time, responsible_id, caption, media, kind)
+        values (${o.client_id}, ${o.title}, ${o.funnel_stage}, ${o.post_type}, ${o.channel}, ${o.status}, ${o.notes || ''}, ${o.pub_date}, ${o.due_date}, ${o.pub_time}, ${o.responsible_id}, ${o.caption || ''}, ${JSON.stringify(o.media || [])}::jsonb, ${o.kind || 'post'})
         returning id`;
       const { rows: full } = await sql(SELECT + ' where p.id = $1', [rows[0].id]);
       return res.status(201).json(full[0]);
@@ -88,9 +89,13 @@ export default async function handler(req, res) {
       const id = (req.query && req.query.id) || (req.body && req.body.id);
       if (!id) return res.status(400).json({ error: 'id é obrigatório' });
       const o = clean(req.body || {});
-      // status anterior (para notificar mudança de coluna)
-      let prevStatus = null;
-      if (o.status) { const cur = await sql('select status from posts where id = $1', [id]); prevStatus = cur.rows[0] && cur.rows[0].status; }
+      // estado anterior (para notificar status e marcar adiado/antecipado)
+      let prevStatus = null, oldDate = null;
+      if (o.status || o.pub_date) {
+        const cur = await sql("select status, to_char(pub_date,'YYYY-MM-DD') as pub_date from posts where id = $1", [id]);
+        if (cur.rows[0]) { prevStatus = cur.rows[0].status; oldDate = cur.rows[0].pub_date; }
+      }
+      if (o.pub_date && oldDate && o.pub_date !== oldDate) o.date_moved = o.pub_date > oldDate ? 'adiado' : 'antecipado';
       // virou "Postado": apaga os anexos do Blob e zera o media (economiza storage)
       if (o.status === 'Postado') {
         const m = await sql('select media from posts where id = $1', [id]);

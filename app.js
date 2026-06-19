@@ -31,6 +31,7 @@ var ICONS = {
  link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
  search:'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
  video:'<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>',
+ file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>',
  moon:'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
  sun:'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
  eye:'<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
@@ -138,8 +139,24 @@ function kpi(label, value, desc, color) {
 /* ===================================================================
    DASHBOARD — visão geral
    =================================================================== */
+var dashPeriod = 'all', dashFrom = '', dashTo = '';
+function dashRange() {
+ var t = new Date(), y = t.getFullYear(), m = t.getMonth();
+ function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+ if (dashPeriod === 'month') return [iso(new Date(y, m, 1)), iso(new Date(y, m + 1, 0))];
+ if (dashPeriod === 'last') return [iso(new Date(y, m - 1, 1)), iso(new Date(y, m, 0))];
+ if (dashPeriod === '30') { var a = new Date(); a.setDate(a.getDate() - 30); return [iso(a), iso(t)]; }
+ if (dashPeriod === 'next30') { var b = new Date(); b.setDate(b.getDate() + 30); return [iso(t), iso(b)]; }
+ if (dashPeriod === 'custom') return [dashFrom || '', dashTo || ''];
+ return ['', ''];
+}
 function renderDashboard(el) {
- var posts = st.posts.filter(function (p) { return (p.kind || 'post') === 'post'; });
+ var rng = dashRange(), from = rng[0], to = rng[1];
+ var posts = st.posts.filter(function (p) {
+  if ((p.kind || 'post') !== 'post') return false;
+  if (from || to) { if (!p.pub_date) return false; if (from && p.pub_date < from) return false; if (to && p.pub_date > to) return false; }
+  return true;
+ });
  var total = posts.length;
  var agendados = posts.filter(function (p) { return p.status === 'Agendado'; }).length;
  var postados = posts.filter(function (p) { return p.status === 'Postado'; }).length;
@@ -163,11 +180,20 @@ function renderDashboard(el) {
  var upPanel = '<div class="panel"><div class="hd"><h3>Próximas publicações</h3></div><div class="bd">' +
   (upcoming.length ? upcoming.map(postRow).join('') : '<div class="empty">Nada agendado à frente.</div>') + '</div></div>';
 
+ var presetOpts = [['all', 'Tudo'], ['month', 'Este mês'], ['last', 'Mês passado'], ['30', 'Últimos 30 dias'], ['next30', 'Próximos 30 dias'], ['custom', 'Personalizado']].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === dashPeriod ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('');
+ var customInputs = dashPeriod === 'custom' ? '<input type="date" class="select" id="dashFrom" value="' + esc(dashFrom) + '"><span class="sub">até</span><input type="date" class="select" id="dashTo" value="' + esc(dashTo) + '">' : '';
+ var rangeNote = (from || to) ? '<span class="sub">(' + (from ? fmtDay(from) : '…') + ' – ' + (to ? fmtDay(to) : '…') + ')</span>' : '';
+ var filterbar = '<div class="filterbar"><span class="sub">Período:</span><select class="select" id="dashPeriodSel">' + presetOpts + '</select>' + customInputs + rangeNote + '</div>';
+
  el.innerHTML = head('Visão geral', 'Acompanhe a operação do calendário editorial em tempo real.',
   '<button class="btn pri" data-new="1">' + ic('plus') + ' Novo post</button>') +
   '<div class="livebar">' + ic('zap', 15) + ' Atualização ao vivo a cada 8s</div>' +
+  filterbar +
   kpis + '<div class="cols2">' + statusPanel + upPanel + '</div>';
 
+ $('#dashPeriodSel', el).onchange = function () { dashPeriod = this.value; renderDashboard(el); };
+ var df = $('#dashFrom', el); if (df) df.onchange = function () { dashFrom = this.value; renderDashboard(el); };
+ var dt = $('#dashTo', el); if (dt) dt.onchange = function () { dashTo = this.value; renderDashboard(el); };
  bindNew(el); bindPostRows(el);
 }
 function postRow(p) {
@@ -227,53 +253,89 @@ function renderFunil(el) {
 /* ===================================================================
    CALENDÁRIO unificado
    =================================================================== */
-var calY, calM, calClient = '', calDragId = null, calExpanded = {};
-function calInit() { if (calY == null) { var t = todayISO().split('-'); calY = +t[0]; calM = +t[1] - 1; } }
-// Monta a grade do mês (barra + dias) para uma lista de posts já filtrada.
-function calGridHTML(posts) {
- calInit();
- var first = new Date(Date.UTC(calY, calM, 1));
- var startW = first.getUTCDay();
+var calY, calM, calClient = '', calDragId = null, calExpanded = {}, calView = 'month', calAnchor = '';
+function calInit() { var t = todayISO(); if (calY == null) { var p = t.split('-'); calY = +p[0]; calM = +p[1] - 1; } if (!calAnchor) calAnchor = t; }
+function isoAddDays(iso, n) { var p = iso.split('-'); var dt = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])); dt.setUTCDate(dt.getUTCDate() + n); return dt.getUTCFullYear() + '-' + String(dt.getUTCMonth() + 1).padStart(2, '0') + '-' + String(dt.getUTCDate()).padStart(2, '0'); }
+function isoWeekStart(iso) { var p = iso.split('-'); var dt = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])); return isoAddDays(iso, -dt.getUTCDay()); }
+function calSyncMonth() { var p = calAnchor.split('-'); calY = +p[0]; calM = +p[1] - 1; }
+function postsOnDay(posts, iso) { return posts.filter(function (p) { return p.pub_date === iso; }).sort(function (a, b) { return (a.pub_time || '') < (b.pub_time || '') ? -1 : 1; }); }
+// HTML de um evento (card) do calendário — compartilhado por mês/semana/dia.
+function calEvHTML(p) {
+ var tlabel = p.kind === 'gravacao' ? 'Gravação' : typeLabel(p.post_type);
+ var mv = p.date_moved === 'adiado' ? '⏩ ' : (p.date_moved === 'antecipado' ? '⏪ ' : '');
+ return '<div class="cal-ev c-' + (STATUS_COLOR[p.status] || 'gray') + '" draggable="true" data-post="' + p.id + '" title="' + esc(p.title + ' — ' + (p.client_name || 'Sem cliente') + ' — ' + tlabel + ' — ' + p.status + (p.date_moved ? ' (' + p.date_moved + ')' : '')) + '">' +
+  '<div class="ce-t"><span class="ce-st">' + statusIcon(p.status) + '</span>' + (p.kind === 'gravacao' ? '🎬 ' : '') + mv + (p.pub_time ? '<b>' + p.pub_time + '</b> ' : '') + esc(p.title) + '</div>' +
+  '<div class="ce-m">' + esc(p.client_name || 'Sem cliente') + ' · ' + tlabel + '</div></div>';
+}
+// Barra superior: navegação + Hoje + seletor Mês/Semana/Dia + legenda.
+function calBarHTML() {
+ var title;
+ if (calView === 'day') title = fmtFull(calAnchor);
+ else if (calView === 'week') { var ws = isoWeekStart(calAnchor); title = fmtDay(ws) + ' – ' + fmtDay(isoAddDays(ws, 6)); }
+ else title = MONFULL[calM] + ' ' + calY;
+ var views = [['month', 'Mês'], ['week', 'Semana'], ['day', 'Dia']].map(function (v) { return '<button class="cal-vbtn' + (calView === v[0] ? ' on' : '') + '" data-calview="' + v[0] + '">' + v[1] + '</button>'; }).join('');
+ return '<div class="cal-bar"><button class="btn icon" id="calPrev">' + ic('left') + '</button>' +
+  '<div class="cal-title">' + title + '</div>' +
+  '<button class="btn icon" id="calNext">' + ic('right') + '</button>' +
+  '<button class="btn sm" id="calToday">Hoje</button>' +
+  '<span class="cal-views">' + views + '</span>' +
+  '<span class="cal-legend">' + STATUS.map(function (s) { return '<span class="cal-leg-item c-' + STATUS_COLOR[s] + '">' + statusIcon(s) + esc(s) + '</span>'; }).join('') + '</span></div>';
+}
+function calMonthHTML(posts) {
+ var startW = new Date(Date.UTC(calY, calM, 1)).getUTCDay();
  var days = new Date(Date.UTC(calY, calM + 1, 0)).getUTCDate();
  var byDay = {};
  posts.filter(function (p) { return p.pub_date; }).forEach(function (p) { var d = p.pub_date.split('-'); if (+d[0] === calY && +d[1] - 1 === calM) { var k = +d[2]; (byDay[k] = byDay[k] || []).push(p); } });
  Object.keys(byDay).forEach(function (k) { byDay[k].sort(function (a, b) { return (a.pub_time || '') < (b.pub_time || '') ? -1 : 1; }); });
-
- var cells = '';
+ var cells = '', todays = todayISO(), MAXEV = 4;
  for (var i = 0; i < startW; i++) cells += '<div class="cal-cell out"></div>';
- var todays = todayISO();
- var MAXEV = 4;
  for (var d = 1; d <= days; d++) {
   var iso = calY + '-' + String(calM + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
   var full = byDay[d] || [];
   var list = calExpanded[iso] ? full : full.slice(0, MAXEV);
   var hidden = full.length - list.length;
-  var evs = list.map(function (p) {
-   var tlabel = p.kind === 'gravacao' ? 'Gravação' : typeLabel(p.post_type);
-   var mv = p.date_moved === 'adiado' ? '⏩ ' : (p.date_moved === 'antecipado' ? '⏪ ' : '');
-   return '<div class="cal-ev c-' + (STATUS_COLOR[p.status] || 'gray') + '" draggable="true" data-post="' + p.id + '" title="' + esc(p.title + ' — ' + (p.client_name || 'Sem cliente') + ' — ' + tlabel + ' — ' + p.status + (p.date_moved ? ' (' + p.date_moved + ')' : '')) + '">' +
-    '<div class="ce-t"><span class="ce-st">' + statusIcon(p.status) + '</span>' + (p.kind === 'gravacao' ? '🎬 ' : '') + mv + (p.pub_time ? '<b>' + p.pub_time + '</b> ' : '') + esc(p.title) + '</div>' +
-    '<div class="ce-m">' + esc(p.client_name || 'Sem cliente') + ' · ' + tlabel + '</div></div>';
-  }).join('');
+  var evs = list.map(calEvHTML).join('');
   var more = hidden > 0 ? '<button class="cal-more" data-more="' + iso + '">+' + hidden + ' mais</button>'
    : (calExpanded[iso] && full.length > MAXEV ? '<button class="cal-more" data-more="' + iso + '">menos</button>' : '');
   cells += '<div class="cal-cell' + (iso === todays ? ' today' : '') + '" data-day="' + iso + '">' +
    '<div class="cal-h"><span class="cal-d">' + d + '</span><button class="cal-add" data-add="' + iso + '">+</button></div>' +
    '<div class="cal-evs">' + evs + '</div>' + more + '</div>';
  }
- return '<div class="cal-bar"><button class="btn icon" id="calPrev">' + ic('left') + '</button>' +
-  '<div class="cal-title">' + MONFULL[calM] + ' ' + calY + '</div>' +
-  '<button class="btn icon" id="calNext">' + ic('right') + '</button>' +
-  '<button class="btn sm" id="calToday">Hoje</button>' +
-  '<span class="cal-legend">' + STATUS.map(function (s) { return '<span class="cal-leg-item c-' + STATUS_COLOR[s] + '">' + statusIcon(s) + esc(s) + '</span>'; }).join('') + '</span></div>' +
-  '<div class="cal-grid head">' + WD.map(function (w) { return '<div class="cal-wd">' + w + '</div>'; }).join('') + '</div>' +
+ return '<div class="cal-grid head">' + WD.map(function (w) { return '<div class="cal-wd">' + w + '</div>'; }).join('') + '</div>' +
   '<div class="cal-grid">' + cells + '</div>';
+}
+function calWeekHTML(posts) {
+ var ws = isoWeekStart(calAnchor), todays = todayISO(), heads = '', cols = '';
+ for (var i = 0; i < 7; i++) {
+  var iso = isoAddDays(ws, i), dd = +iso.split('-')[2], list = postsOnDay(posts, iso);
+  heads += '<div class="cal-wd">' + WD[i] + ' ' + dd + '</div>';
+  cols += '<div class="cal-cell wk' + (iso === todays ? ' today' : '') + '" data-day="' + iso + '">' +
+   '<div class="cal-h"><span class="cal-d">' + dd + '</span><button class="cal-add" data-add="' + iso + '">+</button></div>' +
+   '<div class="cal-evs">' + list.map(calEvHTML).join('') + '</div></div>';
+ }
+ return '<div class="cal-grid head">' + heads + '</div><div class="cal-grid">' + cols + '</div>';
+}
+function calDayHTML(posts) {
+ var iso = calAnchor, list = postsOnDay(posts, iso);
+ return '<div class="cal-dayv"><div class="cal-dayv-h"><b>' + fmtFull(iso) + '</b><button class="cal-add" data-add="' + iso + '">' + ic('plus', 14) + ' Novo</button></div>' +
+  '<div class="cal-dayv-list" data-day="' + iso + '">' + (list.length ? list.map(calEvHTML).join('') : '<div class="empty">Nada agendado neste dia.</div>') + '</div></div>';
+}
+// Monta a visão do calendário (barra + grade) conforme calView.
+function calGridHTML(posts) {
+ calInit();
+ var body = calView === 'day' ? calDayHTML(posts) : (calView === 'week' ? calWeekHTML(posts) : calMonthHTML(posts));
+ return calBarHTML() + body;
 }
 // Liga navegação do mês + clique nos eventos. rerender re-desenha a view atual.
 function bindCal(el, rerender, addClientId) {
- $('#calPrev', el).onclick = function () { calM--; if (calM < 0) { calM = 11; calY--; } rerender(); };
- $('#calNext', el).onclick = function () { calM++; if (calM > 11) { calM = 0; calY++; } rerender(); };
- $('#calToday', el).onclick = function () { var t = todayISO().split('-'); calY = +t[0]; calM = +t[1] - 1; rerender(); };
+ $('#calPrev', el).onclick = function () { if (calView === 'month') { calM--; if (calM < 0) { calM = 11; calY--; } } else { calAnchor = isoAddDays(calAnchor, calView === 'week' ? -7 : -1); calSyncMonth(); } rerender(); };
+ $('#calNext', el).onclick = function () { if (calView === 'month') { calM++; if (calM > 11) { calM = 0; calY++; } } else { calAnchor = isoAddDays(calAnchor, calView === 'week' ? 7 : 1); calSyncMonth(); } rerender(); };
+ $('#calToday', el).onclick = function () { calAnchor = todayISO(); calSyncMonth(); rerender(); };
+ $$('[data-calview]', el).forEach(function (b) { b.onclick = function () {
+  var nv = b.getAttribute('data-calview');
+  if (nv !== 'month' && calView === 'month') { var t = todayISO(), tp = t.split('-'); calAnchor = (+tp[0] === calY && +tp[1] - 1 === calM) ? t : calY + '-' + String(calM + 1).padStart(2, '0') + '-01'; }
+  calView = nv; if (calView === 'month') calSyncMonth(); rerender();
+ }; });
  $$('[data-post]', el).forEach(function (e) {
   e.onclick = function (ev) { ev.stopPropagation(); var p = postById(e.getAttribute('data-post')); if (p) openPostModal(p); };
   e.ondragstart = function (ev) { calDragId = e.getAttribute('data-post'); e.classList.add('dragging'); ev.dataTransfer.effectAllowed = 'move'; ev.stopPropagation(); };
@@ -317,11 +379,21 @@ function renderCliente(el) {
  var t = posts.length, counts = { topo: 0, meio: 0, fundo: 0 };
  posts.forEach(function (p) { counts[p.funnel_stage] = (counts[p.funnel_stage] || 0) + 1; });
  var mix = FUNNEL.map(function (f) { return funnelMeta(f.key).short + ' ' + (t ? Math.round((counts[f.key] || 0) / t * 100) : 0) + '%'; }).join(' · ');
+ var mx = cl.metrics || {};
+ var hasM = mx.followers_start != null || mx.followers_now != null || mx.views_start != null || mx.views_now != null || mx.notes;
+ var metricsPanel = '<div class="panel"><div class="hd"><h3>Dados do cliente</h3>' + (mx.started_at ? '<span class="sub">desde ' + esc(mx.started_at) + '</span>' : '') + '<span class="sp"></span><button class="btn sm" id="editMetrics">' + ic('edit', 14) + ' Editar dados</button></div><div class="bd">' +
+  (hasM ? '<table class="tbl tbl-metrics"><thead><tr><th>Métrica</th><th>Início</th><th>Hoje</th><th>Evolução</th></tr></thead><tbody>' +
+    metricLine('Seguidores', mx.followers_start, mx.followers_now) +
+    metricLine('Visualizações', mx.views_start, mx.views_now) +
+    '</tbody></table>' + (mx.notes ? '<div class="ata" style="margin-top:12px">' + esc(mx.notes) + '</div>' : '')
+   : '<div class="empty">Sem dados ainda. Em “Editar dados”, registre seguidores/visualizações de quando começamos × hoje.</div>') +
+  '</div></div>';
  el.innerHTML = head(cl.name, (cl.is_internal ? 'Interno (Acttus) · ' : '') + t + ' post' + (t === 1 ? '' : 's') + (t ? ' · ' + mix : ''),
   '<button class="btn" data-back="1">' + ic('left') + ' Voltar</button>' +
   '<button class="btn" data-clilink="' + esc(cl.share_token || '') + '">' + ic('link', 15) + ' Link do painel</button>' +
   '<button class="btn" data-cliedit2="1">' + ic('edit', 15) + ' Editar</button>' +
   '<button class="btn pri" data-newc="1">' + ic('plus') + ' Novo post</button>') +
+  metricsPanel +
   '<div class="panel"><div class="hd"><h3>Kanban</h3><span class="sp"></span><span class="sub">arraste para mudar o status</span></div><div class="bd"><div class="board">' + statusColumns(posts) + '</div></div></div>' +
   '<div class="panel"><div class="hd"><h3>Calendário</h3><span class="sp"></span>' +
    (planned ? '<span class="bg c-green"><span class="bgdot"></span>Mês planejado</span>' : '') +
@@ -331,9 +403,35 @@ function renderCliente(el) {
  var tp = $('#togglePlan', el); if (tp) tp.onclick = function () { S.togglePlan(cl.id, ymPlan).then(function () { toast(planned ? 'Mês desmarcado' : 'Mês marcado como planejado'); renderCliente(el); }).catch(function (e) { toast(e.message, 'err'); }); };
  var clk = $('[data-clilink]', el); if (clk) clk.onclick = function () { copyPanelLink(cl.share_token); };
  var ced = $('[data-cliedit2]', el); if (ced) ced.onclick = function () { openClientModal(cl); };
+ var em = $('#editMetrics', el); if (em) em.onclick = function () { openMetricsModal(cl); };
  $$('[data-newc]', el).forEach(function (b) { b.onclick = function () { openPostModal(null, { client_id: cl.id }); }; });
  bindBoard(el);
  bindCal(el, function () { renderCliente(el); }, cl.id);
+}
+function fmtNum(n) { return (Number(n) || 0).toLocaleString('pt-BR'); }
+function metricLine(label, start, now) {
+ var hasStart = start != null && start !== '', hasNow = now != null && now !== '';
+ var s = +start || 0, w = +now || 0;
+ var delta = (hasStart && hasNow && s) ? Math.round((w - s) / s * 100) : null;
+ var grow = delta === null ? '<span class="sub">—</span>' : '<span class="bg c-' + (delta >= 0 ? 'green' : 'red') + '">' + (delta >= 0 ? '+' : '') + delta + '%</span>';
+ return '<tr><td>' + label + '</td><td>' + (hasStart ? fmtNum(start) : '—') + '</td><td>' + (hasNow ? fmtNum(now) : '—') + '</td><td>' + grow + '</td></tr>';
+}
+function openMetricsModal(cl) {
+ var mx = cl.metrics || {};
+ function val(v) { return v == null ? '' : v; }
+ openModal('Dados do cliente — ' + esc(cl.name), ic('zap'),
+  '<label class="fld"><span>Trabalhamos desde (mês/ano)</span><input id="cmStart" value="' + esc(mx.started_at || '') + '" placeholder="Ex.: Jan/2026"></label>' +
+  '<div class="mrow2"><label class="fld"><span>Seguidores no início</span><input type="number" id="cmFs" value="' + esc(val(mx.followers_start)) + '" placeholder="0"></label>' +
+  '<label class="fld"><span>Seguidores hoje</span><input type="number" id="cmFn" value="' + esc(val(mx.followers_now)) + '" placeholder="0"></label></div>' +
+  '<div class="mrow2"><label class="fld"><span>Visualizações no início</span><input type="number" id="cmVs" value="' + esc(val(mx.views_start)) + '" placeholder="0"></label>' +
+  '<label class="fld"><span>Visualizações hoje</span><input type="number" id="cmVn" value="' + esc(val(mx.views_now)) + '" placeholder="0"></label></div>' +
+  '<label class="fld"><span>Observações</span><textarea id="cmNotes" rows="3" placeholder="Outras métricas, contexto, metas...">' + esc(mx.notes || '') + '</textarea></label>',
+  function () {
+   function num(id) { var v = $('#' + id).value.trim(); return v === '' ? null : (+v); }
+   var metrics = { started_at: $('#cmStart').value.trim(), followers_start: num('cmFs'), followers_now: num('cmFn'), views_start: num('cmVs'), views_now: num('cmVn'), notes: $('#cmNotes').value.trim() };
+   S.updateClient(cl.id, { metrics: metrics }).then(function () { toast('Dados salvos'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
+   return false;
+  }, 'Salvar');
 }
 
 /* ===================================================================
@@ -555,6 +653,27 @@ function imgUploader(box, getUrl, setUrl) {
  }
  paint();
 }
+// Widget de anexos (arquivos quaisquer) com lista + adicionar + remover.
+function attUploader(box, getArr, setArr) {
+ function paint() {
+  var arr = getArr();
+  box.innerHTML = arr.map(function (a, i) {
+   return '<div class="att"><span class="att-thumb">' + ic('file', 14) + '</span><a class="att-n" href="' + esc(a.url) + '" target="_blank" rel="noopener">' + esc(a.name || 'arquivo') + '</a><button type="button" class="iconbtn" data-rm="' + i + '">' + ic('x', 14) + '</button></div>';
+  }).join('') + '<label class="att-add">' + ic('plus', 14) + ' Adicionar arquivo<input type="file" hidden></label>';
+  box.querySelector('input[type=file]').onchange = function () {
+   var f = this.files && this.files[0]; if (!f) return; this.value = '';
+   toast('Enviando arquivo…');
+   uploadBlob(f).then(function (url) { var a = getArr(); a.push({ url: url, name: f.name, type: f.type }); setArr(a); paint(); toast('Anexo adicionado'); }).catch(function (e) { toast('Falha: ' + (e.message || e), 'err'); });
+  };
+  $$('[data-rm]', box).forEach(function (b) { b.onclick = function () { var a = getArr(); a.splice(+b.getAttribute('data-rm'), 1); setArr(a); paint(); }; });
+ }
+ paint();
+}
+// Lista de anexos só-leitura (chips com link).
+function attachmentsView(arr) {
+ if (!arr || !arr.length) return '';
+ return '<div class="att-view">' + arr.map(function (a) { return '<a class="att-chip" href="' + esc(a.url) + '" target="_blank" rel="noopener">' + ic('file', 13) + ' ' + esc(a.name || 'arquivo') + '</a>'; }).join('') + '</div>';
+}
 function openClientModal(cli) {
  var c = cli || {}, editing = !!cli;
  var avatarUrl = c.avatar_url || '', coverUrl = c.cover_url || '';
@@ -642,12 +761,14 @@ function renderReuniao(el) {
   '<button class="btn" data-back="1">' + ic('left') + ' Reuniões</button>' +
   '<button class="btn" id="mtEdit">' + ic('edit', 15) + ' Editar</button>') +
   (parts.length ? '<div class="note">' + ic('users', 15) + ' <span>Participantes: <b>' + esc(parts.join(', ')) + '</b></span></div>' : '') +
-  '<div class="panel"><div class="hd"><h3>Pauta / anotações</h3></div><div class="bd"><div class="ata">' + (m.notes ? esc(m.notes) : '<span class="empty">Sem anotações ainda. Clique em Editar para escrever a pauta.</span>') + '</div></div></div>';
+  '<div class="panel"><div class="hd"><h3>Pauta / anotações</h3></div><div class="bd"><div class="ata">' + (m.notes ? esc(m.notes) : '<span class="empty">Sem anotações ainda. Clique em Editar para escrever a pauta.</span>') + '</div></div></div>' +
+  ((m.attachments && m.attachments.length) ? '<div class="panel"><div class="hd"><h3>Anexos</h3></div><div class="bd">' + attachmentsView(m.attachments) + '</div></div>' : '');
  $('[data-back]', el).onclick = function () { go('reunioes'); };
  $('#mtEdit', el).onclick = function () { openMeetingModal(m); };
 }
 function openMeetingModal(meet) {
  var m = meet || {}, editing = !!meet, sel = m.participants || [];
+ var atts = (m.attachments || []).slice();
  var partChecks = st.users.length ? st.users.map(function (u) {
   return '<label class="pchk"><input type="checkbox" value="' + u.id + '"' + (sel.indexOf(u.id) >= 0 ? ' checked' : '') + '> ' + esc(u.name) + '</label>';
  }).join('') : '<div class="sub">Nenhum usuário cadastrado ainda.</div>';
@@ -656,17 +777,19 @@ function openMeetingModal(meet) {
   '<div class="mrow2"><label class="fld"><span>Data</span><input type="date" id="mtDate" value="' + esc(m.meeting_date || '') + '"></label>' +
   '<label class="fld"><span>Categoria</span><input id="mtCat" value="' + esc(m.category || '') + '" placeholder="Ex.: Planejamento, Cliente, Interna"></label></div>' +
   '<div class="fld"><span>Participantes</span><div class="pchks">' + partChecks + '</div></div>' +
-  '<label class="fld"><span>Pauta / anotações</span><textarea id="mtNotes" rows="9" placeholder="Assuntos discutidos, decisões, próximos passos...">' + esc(m.notes || '') + '</textarea></label>';
+  '<label class="fld"><span>Pauta / anotações</span><textarea id="mtNotes" rows="8" placeholder="Assuntos discutidos, decisões, próximos passos...">' + esc(m.notes || '') + '</textarea></label>' +
+  '<div class="fld"><span>Anexos</span><div class="att-list" id="mtAtts"></div></div>';
  var extra = editing ? '<button class="btn danger" id="mtDel">' + ic('trash', 15) + ' Excluir</button>' : '';
  openModal(editing ? 'Editar pauta' : 'Nova pauta', ic('book'), body, function () {
   var title = $('#mtTitle').value.trim();
   if (!title) { toast('Informe o título', 'err'); return false; }
   var parts = $$('#mboxc .pchks input:checked').map(function (i) { return i.value; });
-  var payload = { title: title, meeting_date: $('#mtDate').value || null, category: $('#mtCat').value.trim(), participants: parts, notes: $('#mtNotes').value };
+  var payload = { title: title, meeting_date: $('#mtDate').value || null, category: $('#mtCat').value.trim(), participants: parts, notes: $('#mtNotes').value, attachments: atts };
   var op = editing ? S.updateMeeting(meet.id, payload) : S.createMeeting(payload);
   op.then(function () { toast(editing ? 'Pauta salva' : 'Pauta criada'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
   return false;
  }, editing ? 'Salvar' : 'Criar pauta', extra);
+ attUploader($('#mtAtts'), function () { return atts; }, function (a) { atts = a; });
  if (editing) $('#mtDel').onclick = function () { if (!confirm('Excluir esta pauta?')) return; S.deleteMeeting(meet.id).then(function () { toast('Pauta excluída'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); }); };
 }
 
@@ -713,6 +836,7 @@ function renderProjeto(el) {
   '<button class="btn" data-back="1">' + ic('left') + ' Voltar</button>' +
   '<button class="btn" id="editProj">' + ic('edit', 15) + ' Editar</button>' +
   '<button class="btn pri" id="newTask">' + ic('plus') + ' Nova tarefa</button>') +
+  ((p.attachments && p.attachments.length) ? '<div class="panel"><div class="hd"><h3>Anexos</h3></div><div class="bd">' + attachmentsView(p.attachments) + '</div></div>' : '') +
   '<div class="board board3">' + cols + '</div>';
  $('[data-back]', el).onclick = function () { go('projetos'); };
  $('#editProj', el).onclick = function () { openProjectModal(p); };
@@ -721,20 +845,23 @@ function renderProjeto(el) {
 }
 function openProjectModal(proj) {
  var p = proj || {}, editing = !!proj;
+ var atts = (p.attachments || []).slice();
  var userOpts = '<option value="">Sem responsável</option>' + st.users.map(function (u) { return '<option value="' + u.id + '"' + (u.id === (p.responsible_id || '') ? ' selected' : '') + '>' + esc(u.name) + '</option>'; }).join('');
  var statusOpts = ['Ativo', 'Pausado', 'Concluído'].map(function (s) { return '<option' + (s === (p.status || 'Ativo') ? ' selected' : '') + '>' + s + '</option>'; }).join('');
  openModal(editing ? 'Editar projeto' : 'Novo projeto', ic('folder'),
   '<label class="fld"><span>Nome</span><input id="pjName" value="' + esc(p.name || '') + '" placeholder="Ex.: Rebranding do site"></label>' +
   '<div class="mrow2"><label class="fld"><span>Responsável</span><select id="pjResp">' + userOpts + '</select></label>' +
   '<label class="fld"><span>Status</span><select id="pjStatus">' + statusOpts + '</select></label></div>' +
-  '<label class="fld"><span>Descrição</span><textarea id="pjDesc" rows="3">' + esc(p.description || '') + '</textarea></label>',
+  '<label class="fld"><span>Descrição</span><textarea id="pjDesc" rows="3">' + esc(p.description || '') + '</textarea></label>' +
+  '<div class="fld"><span>Anexos</span><div class="att-list" id="pjAtts"></div></div>',
   function () {
    var name = $('#pjName').value.trim(); if (!name) { toast('Informe o nome', 'err'); return false; }
-   var payload = { name: name, responsible_id: $('#pjResp').value || null, status: $('#pjStatus').value, description: $('#pjDesc').value };
+   var payload = { name: name, responsible_id: $('#pjResp').value || null, status: $('#pjStatus').value, description: $('#pjDesc').value, attachments: atts };
    var op = editing ? S.updateProject(proj.id, payload) : S.createProject(payload);
    op.then(function (np) { toast(editing ? 'Projeto salvo' : 'Projeto criado'); closeModal(); if (!editing && np) openProjeto(np.id); }).catch(function (e) { toast(e.message, 'err'); });
    return false;
   }, editing ? 'Salvar' : 'Criar projeto', editing ? '<button class="btn danger" id="pjDel">' + ic('trash', 15) + ' Excluir</button>' : '');
+ attUploader($('#pjAtts'), function () { return atts; }, function (a) { atts = a; });
  if (editing) $('#pjDel').onclick = function () { if (!confirm('Excluir o projeto e todas as tarefas dele?')) return; S.deleteProject(proj.id).then(function () { toast('Projeto excluído'); closeModal(); go('projetos'); }).catch(function (e) { toast(e.message, 'err'); }); };
 }
 function openTaskModal(task, projectId) {

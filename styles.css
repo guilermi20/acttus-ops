@@ -224,8 +224,22 @@ select.select{appearance:none;-webkit-appearance:none;padding-right:30px;backgro
 .cal-ev .ce-st .i{width:13px;height:13px}
 .cal-more{margin-top:1px;border:0;background:transparent;color:var(--mut);font-size:10.5px;font-weight:700;cursor:pointer;padding:1px 4px;border-radius:5px;text-align:left;align-self:flex-start}
 .cal-more:hover{color:var(--ink);background:var(--panel3)}
+/* seletor de visão Mês/Semana/Dia */
+.cal-views{display:inline-flex;gap:2px;background:var(--panel2);border:1px solid var(--line2);border-radius:9px;padding:2px}
+.cal-vbtn{border:0;background:transparent;color:var(--mut);font-family:var(--f);font-size:12.5px;font-weight:700;padding:5px 11px;border-radius:7px;cursor:pointer}
+.cal-vbtn:hover{color:var(--ink)}
+.cal-vbtn.on{background:var(--yellow);color:var(--yellow-ink)}
+/* visão semana: células mais altas */
+.cal-cell.wk{min-height:200px}
+/* visão dia */
+.cal-dayv{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.cal-dayv-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);font-size:15px}
+.cal-dayv-h .cal-add{opacity:1;width:auto;height:auto;gap:6px;padding:6px 12px;font-size:13px;font-weight:700}
+.cal-dayv-list{display:flex;flex-direction:column;gap:7px;padding:14px;min-height:120px}
+.cal-dayv-list .cal-ev{font-size:13px;padding:9px 12px}
+.cal-dayv-list .cal-ev .ce-m{font-size:11.5px}
 @media(max-width:980px){.wrap{padding:20px 18px 80px}}
-@media(max-width:760px){.cal-grid{gap:5px}.cal-cell{min-height:74px;padding:5px 5px 6px;border-radius:9px}.cal-ev{font-size:10px;padding:2px 5px}.cal-ev .ce-m{display:none}.cal-leg-item{font-size:10px}.cal-title{font-size:16px;min-width:0}}
+@media(max-width:760px){.cal-bar{flex-wrap:wrap}.cal-legend{width:100%;margin-left:0;justify-content:flex-start;order:5}.cal-grid{gap:5px}.cal-cell{min-height:74px;padding:5px 5px 6px;border-radius:9px}.cal-cell.wk{min-height:120px}.cal-ev{font-size:10px;padding:2px 5px}.cal-cell .cal-ev .ce-m{display:none}.cal-leg-item{font-size:10px}.cal-title{font-size:16px;min-width:0;flex:1}.cal-add{opacity:1}}
 
 /* ---------- BOARD ---------- */
 .board{display:grid;grid-template-columns:repeat(6,minmax(200px,1fr));gap:12px;margin-top:18px;overflow-x:auto;padding-bottom:8px}
@@ -243,7 +257,7 @@ select.select{appearance:none;-webkit-appearance:none;padding-right:30px;backgro
 .kc-m{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut);margin-top:6px}
 .kc-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
 .ptag{font-size:10.5px;font-weight:700;border-radius:6px;padding:2px 7px;background:var(--panel3);color:var(--ink2)}
-.ptag.c-blue{background:var(--blue-soft);color:var(--blue)} .ptag.c-amber{background:var(--amber-soft);color:var(--amber)} .ptag.c-green{background:var(--green-soft);color:var(--green)}
+.ptag.c-blue{background:var(--blue-soft);color:var(--blue)} .ptag.c-amber{background:var(--amber-soft);color:var(--amber)} .ptag.c-green{background:var(--green-soft);color:var(--green)} .ptag.c-purple{background:var(--purple-soft);color:var(--purple)}
 .kc-f{display:flex;align-items:center;justify-content:space-between;margin-top:10px}
 .kc-dt{font-size:11.5px;color:var(--mut);display:inline-flex;align-items:center;gap:4px}
 .overdue{font-size:11.5px;font-weight:700;color:var(--red);display:inline-flex;align-items:center;gap:4px}
@@ -439,6 +453,11 @@ img.pp-media.zoomable{cursor:zoom-in}
 .att-n{flex:1;min-width:0;font-size:12.5px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .att-empty{font-size:12.5px;color:var(--mut2);padding:4px 2px}
 .att-add{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--yellow);cursor:pointer;border:1px dashed var(--yellow-line);border-radius:9px;padding:8px 12px;background:var(--yellow-soft)}
+.att-view{display:flex;flex-wrap:wrap;gap:8px}
+.att-chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--ink2);background:var(--panel2);border:1px solid var(--line2);border-radius:8px;padding:6px 10px;text-decoration:none}
+.att-chip:hover{border-color:var(--yellow-line);color:var(--yellow)}
+.tbl-metrics td:nth-child(2),.tbl-metrics td:nth-child(3),.tbl-metrics th:nth-child(2),.tbl-metrics th:nth-child(3){text-align:right;font-variant-numeric:tabular-nums}
+.tbl-metrics td:last-child,.tbl-metrics th:last-child{text-align:right}
 
 /* widget de imagem (foto/capa do cliente) */
 .imgup{display:flex;align-items:center;gap:10px}

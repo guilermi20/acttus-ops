@@ -122,11 +122,11 @@ export default async function handler(req, res) {
           try { await sendGroup(msg); } catch (e) {}
         } else if (o.status === 'Postado') {
           try { await sendGroup('📣 *Publicado* — ' + (post.client_name || 'sem cliente') + '\n*' + post.title + '*'); } catch (e) {}
-          try {
-            const bg = await sql("select phone from users where lower(email) = 'bigode@acttus.com' or lower(name) = 'bigode' limit 1");
-            const phone = bg.rows[0] && bg.rows[0].phone;
-            if (phone) await sendDM(phone, 'Acabamos de postar o ' + (post.post_type === 'reels' ? 'reels' : 'post') + ' de hoje: ' + post.title + (post.caption ? '\n\n📝 Legenda sugerida:\n' + post.caption : ''));
-          } catch (e) {}
+          let bigode = null;
+          try { const bg = await sql("select id, phone from users where lower(email) = 'bigode@acttus.com' or lower(name) = 'bigode' limit 1"); bigode = bg.rows[0] || null; } catch (e) {}
+          try { if (bigode && bigode.phone) await sendDM(bigode.phone, 'Acabamos de postar o ' + (post.post_type === 'reels' ? 'reels' : 'post') + ' de hoje: ' + post.title + (post.caption ? '\n\n📝 Legenda sugerida:\n' + post.caption : '')); } catch (e) {}
+          // lembrete pro Bigode: agendar a gravação desse cliente (independente do envio do DM)
+          try { if (bigode && post.client_id) await sql('insert into routines (owner_id, title, notes) values ($1, $2, $3)', [bigode.id, 'Agendar gravação — ' + (post.client_name || 'cliente'), 'Gerado ao publicar: ' + post.title]); } catch (e) {}
         } else {
           const msg = '🔄 *Acttus OS — mudança de status*\n*' + post.title + '* — ' + (post.client_name || 'sem cliente') + '\n' + prevStatus + ' → *' + post.status + '*' + (post.responsible_name ? '\nResponsável: ' + post.responsible_name : '');
           try { await sendGroup(msg); } catch (e) {}

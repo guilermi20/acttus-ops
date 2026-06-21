@@ -263,9 +263,11 @@ function postsOnDay(posts, iso) { return posts.filter(function (p) { return p.pu
 function calEvHTML(p) {
  var tlabel = p.kind === 'gravacao' ? 'Gravação' : typeLabel(p.post_type);
  var mv = p.date_moved === 'adiado' ? '⏩ ' : (p.date_moved === 'antecipado' ? '⏪ ' : '');
- return '<div class="cal-ev c-' + (STATUS_COLOR[p.status] || 'gray') + '" draggable="true" data-post="' + p.id + '" title="' + esc(p.title + ' — ' + (p.client_name || 'Sem cliente') + ' — ' + tlabel + ' — ' + p.status + (p.date_moved ? ' (' + p.date_moved + ')' : '')) + '">' +
-  '<div class="ce-t"><span class="ce-st">' + statusIcon(p.status) + '</span>' + (p.kind === 'gravacao' ? '🎬 ' : '') + mv + (p.pub_time ? '<b>' + p.pub_time + '</b> ' : '') + esc(p.title) + '</div>' +
-  '<div class="ce-m">' + esc(p.client_name || 'Sem cliente') + ' · ' + tlabel + '</div></div>';
+ var noResp = !p.responsible_id;
+ var respM = noResp ? '⚠️ sem responsável' : '👤 ' + esc(p.responsible_name || '');
+ return '<div class="cal-ev c-' + (STATUS_COLOR[p.status] || 'gray') + (noResp ? ' noresp' : '') + '" draggable="true" data-post="' + p.id + '" title="' + esc(p.title + ' — ' + (p.client_name || 'Sem cliente') + ' — ' + tlabel + ' — ' + p.status + (p.date_moved ? ' (' + p.date_moved + ')' : '') + ' — ' + (p.responsible_name ? p.responsible_name : 'sem responsável')) + '">' +
+  '<div class="ce-t"><span class="ce-st">' + statusIcon(p.status) + '</span>' + (noResp ? '⚠️ ' : '') + (p.kind === 'gravacao' ? '🎬 ' : '') + mv + (p.pub_time ? '<b>' + p.pub_time + '</b> ' : '') + esc(p.title) + '</div>' +
+  '<div class="ce-m">' + esc(p.client_name || 'Sem cliente') + ' · ' + tlabel + ' · ' + respM + '</div></div>';
 }
 // Barra superior: navegação + Hoje + seletor Mês/Semana/Dia + legenda.
 function calBarHTML() {
@@ -654,17 +656,23 @@ function imgUploader(box, getUrl, setUrl) {
  paint();
 }
 // Widget de anexos (arquivos quaisquer) com lista + adicionar + remover.
+function arrSwap(a, i, j) { if (i < 0 || j < 0 || i >= a.length || j >= a.length) return; var t = a[i]; a[i] = a[j]; a[j] = t; }
 function attUploader(box, getArr, setArr) {
  function paint() {
   var arr = getArr();
   box.innerHTML = arr.map(function (a, i) {
-   return '<div class="att"><span class="att-thumb">' + ic('file', 14) + '</span><a class="att-n" href="' + esc(a.url) + '" target="_blank" rel="noopener">' + esc(a.name || 'arquivo') + '</a><button type="button" class="iconbtn" data-rm="' + i + '">' + ic('x', 14) + '</button></div>';
+   return '<div class="att"><span class="att-thumb">' + ic('file', 14) + '</span><a class="att-n" href="' + esc(a.url) + '" target="_blank" rel="noopener">' + esc(a.name || 'arquivo') + '</a>' +
+    '<button type="button" class="iconbtn move" data-up="' + i + '"' + (i === 0 ? ' disabled' : '') + ' title="Subir">↑</button>' +
+    '<button type="button" class="iconbtn move" data-dn="' + i + '"' + (i === arr.length - 1 ? ' disabled' : '') + ' title="Descer">↓</button>' +
+    '<button type="button" class="iconbtn" data-rm="' + i + '">' + ic('x', 14) + '</button></div>';
   }).join('') + '<label class="att-add">' + ic('plus', 14) + ' Adicionar arquivo<input type="file" hidden></label>';
   box.querySelector('input[type=file]').onchange = function () {
    var f = this.files && this.files[0]; if (!f) return; this.value = '';
    toast('Enviando arquivo…');
    uploadBlob(f).then(function (url) { var a = getArr(); a.push({ url: url, name: f.name, type: f.type }); setArr(a); paint(); toast('Anexo adicionado'); }).catch(function (e) { toast('Falha: ' + (e.message || e), 'err'); });
   };
+  $$('[data-up]', box).forEach(function (b) { b.onclick = function () { var i = +b.getAttribute('data-up'); var a = getArr(); arrSwap(a, i, i - 1); setArr(a); paint(); }; });
+  $$('[data-dn]', box).forEach(function (b) { b.onclick = function () { var i = +b.getAttribute('data-dn'); var a = getArr(); arrSwap(a, i, i + 1); setArr(a); paint(); }; });
   $$('[data-rm]', box).forEach(function (b) { b.onclick = function () { var a = getArr(); a.splice(+b.getAttribute('data-rm'), 1); setArr(a); paint(); }; });
  }
  paint();
@@ -1049,8 +1057,13 @@ function openPostModal(post, defaults) {
   var box = $('#attList'); if (!box) return;
   box.innerHTML = media.length ? media.map(function (m, i) {
    var thumb = (m.type || '').indexOf('video') === 0 ? '<span class="att-thumb vid">' + ic('grid', 16) + '</span>' : '<span class="att-thumb" style="background-image:url(' + JSON.stringify(m.url) + ')"></span>';
-   return '<div class="att">' + thumb + '<span class="att-n">' + esc(m.name || 'arquivo') + '</span><button type="button" class="iconbtn" data-attdel="' + i + '">' + ic('x', 14) + '</button></div>';
+   return '<div class="att">' + thumb + '<span class="att-n">' + esc(m.name || 'arquivo') + '</span>' +
+    '<button type="button" class="iconbtn move" data-attup="' + i + '"' + (i === 0 ? ' disabled' : '') + ' title="Subir">↑</button>' +
+    '<button type="button" class="iconbtn move" data-attdn="' + i + '"' + (i === media.length - 1 ? ' disabled' : '') + ' title="Descer">↓</button>' +
+    '<button type="button" class="iconbtn" data-attdel="' + i + '">' + ic('x', 14) + '</button></div>';
   }).join('') : '<div class="att-empty">Nenhum anexo.</div>';
+  $$('[data-attup]', box).forEach(function (b) { b.onclick = function () { var i = +b.getAttribute('data-attup'); arrSwap(media, i, i - 1); renderAtt(); }; });
+  $$('[data-attdn]', box).forEach(function (b) { b.onclick = function () { var i = +b.getAttribute('data-attdn'); arrSwap(media, i, i + 1); renderAtt(); }; });
   $$('[data-attdel]', box).forEach(function (b) { b.onclick = function () { media.splice(+b.getAttribute('data-attdel'), 1); renderAtt(); }; });
  }
  renderAtt();

@@ -366,6 +366,10 @@ button.tag.ok:hover{filter:brightness(1.1)}
 .rrow.late .tx .m{color:var(--red);font-weight:600}
 .iconbtn{border:0;background:transparent;color:var(--mut2);padding:6px;border-radius:8px;cursor:pointer;flex:0 0 auto}
 .iconbtn:hover{background:var(--panel3);color:var(--red)}
+.iconbtn.move{font-size:14px;font-weight:800;line-height:1;padding:6px 7px;color:var(--mut)}
+.iconbtn.move:hover{background:var(--panel3);color:var(--yellow)}
+.iconbtn:disabled{opacity:.3;cursor:default;pointer-events:none}
+.cal-ev.noresp{border-left-style:dashed;border-left-width:3px}
 
 /* blocos de prioridade (Minhas demandas) */
 .prioblock + .prioblock{margin-top:14px}

@@ -655,33 +655,8 @@ function imgUploader(box, getUrl, setUrl) {
  }
  paint();
 }
-// Widget de anexos (arquivos quaisquer) com lista + adicionar + remover.
+// Move um item dentro de um array (usado pela reordenação de mídia dos posts).
 function arrSwap(a, i, j) { if (i < 0 || j < 0 || i >= a.length || j >= a.length) return; var t = a[i]; a[i] = a[j]; a[j] = t; }
-function attUploader(box, getArr, setArr) {
- function paint() {
-  var arr = getArr();
-  box.innerHTML = arr.map(function (a, i) {
-   return '<div class="att"><span class="att-thumb">' + ic('file', 14) + '</span><a class="att-n" href="' + esc(a.url) + '" target="_blank" rel="noopener">' + esc(a.name || 'arquivo') + '</a>' +
-    '<button type="button" class="iconbtn move" data-up="' + i + '"' + (i === 0 ? ' disabled' : '') + ' title="Subir">↑</button>' +
-    '<button type="button" class="iconbtn move" data-dn="' + i + '"' + (i === arr.length - 1 ? ' disabled' : '') + ' title="Descer">↓</button>' +
-    '<button type="button" class="iconbtn" data-rm="' + i + '">' + ic('x', 14) + '</button></div>';
-  }).join('') + '<label class="att-add">' + ic('plus', 14) + ' Adicionar arquivo<input type="file" hidden></label>';
-  box.querySelector('input[type=file]').onchange = function () {
-   var f = this.files && this.files[0]; if (!f) return; this.value = '';
-   toast('Enviando arquivo…');
-   uploadBlob(f).then(function (url) { var a = getArr(); a.push({ url: url, name: f.name, type: f.type }); setArr(a); paint(); toast('Anexo adicionado'); }).catch(function (e) { toast('Falha: ' + (e.message || e), 'err'); });
-  };
-  $$('[data-up]', box).forEach(function (b) { b.onclick = function () { var i = +b.getAttribute('data-up'); var a = getArr(); arrSwap(a, i, i - 1); setArr(a); paint(); }; });
-  $$('[data-dn]', box).forEach(function (b) { b.onclick = function () { var i = +b.getAttribute('data-dn'); var a = getArr(); arrSwap(a, i, i + 1); setArr(a); paint(); }; });
-  $$('[data-rm]', box).forEach(function (b) { b.onclick = function () { var a = getArr(); a.splice(+b.getAttribute('data-rm'), 1); setArr(a); paint(); }; });
- }
- paint();
-}
-// Lista de anexos só-leitura (chips com link).
-function attachmentsView(arr) {
- if (!arr || !arr.length) return '';
- return '<div class="att-view">' + arr.map(function (a) { return '<a class="att-chip" href="' + esc(a.url) + '" target="_blank" rel="noopener">' + ic('file', 13) + ' ' + esc(a.name || 'arquivo') + '</a>'; }).join('') + '</div>';
-}
 function openClientModal(cli) {
  var c = cli || {}, editing = !!cli;
  var avatarUrl = c.avatar_url || '', coverUrl = c.cover_url || '';
@@ -769,14 +744,12 @@ function renderReuniao(el) {
   '<button class="btn" data-back="1">' + ic('left') + ' Reuniões</button>' +
   '<button class="btn" id="mtEdit">' + ic('edit', 15) + ' Editar</button>') +
   (parts.length ? '<div class="note">' + ic('users', 15) + ' <span>Participantes: <b>' + esc(parts.join(', ')) + '</b></span></div>' : '') +
-  '<div class="panel"><div class="hd"><h3>Pauta / anotações</h3></div><div class="bd"><div class="ata">' + (m.notes ? esc(m.notes) : '<span class="empty">Sem anotações ainda. Clique em Editar para escrever a pauta.</span>') + '</div></div></div>' +
-  ((m.attachments && m.attachments.length) ? '<div class="panel"><div class="hd"><h3>Anexos</h3></div><div class="bd">' + attachmentsView(m.attachments) + '</div></div>' : '');
+  '<div class="panel"><div class="hd"><h3>Pauta / anotações</h3></div><div class="bd"><div class="ata">' + (m.notes ? esc(m.notes) : '<span class="empty">Sem anotações ainda. Clique em Editar para escrever a pauta.</span>') + '</div></div></div>';
  $('[data-back]', el).onclick = function () { go('reunioes'); };
  $('#mtEdit', el).onclick = function () { openMeetingModal(m); };
 }
 function openMeetingModal(meet) {
  var m = meet || {}, editing = !!meet, sel = m.participants || [];
- var atts = (m.attachments || []).slice();
  var partChecks = st.users.length ? st.users.map(function (u) {
   return '<label class="pchk"><input type="checkbox" value="' + u.id + '"' + (sel.indexOf(u.id) >= 0 ? ' checked' : '') + '> ' + esc(u.name) + '</label>';
  }).join('') : '<div class="sub">Nenhum usuário cadastrado ainda.</div>';
@@ -785,19 +758,17 @@ function openMeetingModal(meet) {
   '<div class="mrow2"><label class="fld"><span>Data</span><input type="date" id="mtDate" value="' + esc(m.meeting_date || '') + '"></label>' +
   '<label class="fld"><span>Categoria</span><input id="mtCat" value="' + esc(m.category || '') + '" placeholder="Ex.: Planejamento, Cliente, Interna"></label></div>' +
   '<div class="fld"><span>Participantes</span><div class="pchks">' + partChecks + '</div></div>' +
-  '<label class="fld"><span>Pauta / anotações</span><textarea id="mtNotes" rows="8" placeholder="Assuntos discutidos, decisões, próximos passos...">' + esc(m.notes || '') + '</textarea></label>' +
-  '<div class="fld"><span>Anexos</span><div class="att-list" id="mtAtts"></div></div>';
+  '<label class="fld"><span>Pauta / anotações</span><textarea id="mtNotes" rows="9" placeholder="Assuntos discutidos, decisões, próximos passos...">' + esc(m.notes || '') + '</textarea></label>';
  var extra = editing ? '<button class="btn danger" id="mtDel">' + ic('trash', 15) + ' Excluir</button>' : '';
  openModal(editing ? 'Editar pauta' : 'Nova pauta', ic('book'), body, function () {
   var title = $('#mtTitle').value.trim();
   if (!title) { toast('Informe o título', 'err'); return false; }
   var parts = $$('#mboxc .pchks input:checked').map(function (i) { return i.value; });
-  var payload = { title: title, meeting_date: $('#mtDate').value || null, category: $('#mtCat').value.trim(), participants: parts, notes: $('#mtNotes').value, attachments: atts };
+  var payload = { title: title, meeting_date: $('#mtDate').value || null, category: $('#mtCat').value.trim(), participants: parts, notes: $('#mtNotes').value };
   var op = editing ? S.updateMeeting(meet.id, payload) : S.createMeeting(payload);
   op.then(function () { toast(editing ? 'Pauta salva' : 'Pauta criada'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
   return false;
  }, editing ? 'Salvar' : 'Criar pauta', extra);
- attUploader($('#mtAtts'), function () { return atts; }, function (a) { atts = a; });
  if (editing) $('#mtDel').onclick = function () { if (!confirm('Excluir esta pauta?')) return; S.deleteMeeting(meet.id).then(function () { toast('Pauta excluída'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); }); };
 }
 
@@ -844,7 +815,6 @@ function renderProjeto(el) {
   '<button class="btn" data-back="1">' + ic('left') + ' Voltar</button>' +
   '<button class="btn" id="editProj">' + ic('edit', 15) + ' Editar</button>' +
   '<button class="btn pri" id="newTask">' + ic('plus') + ' Nova tarefa</button>') +
-  ((p.attachments && p.attachments.length) ? '<div class="panel"><div class="hd"><h3>Anexos</h3></div><div class="bd">' + attachmentsView(p.attachments) + '</div></div>' : '') +
   '<div class="board board3">' + cols + '</div>';
  $('[data-back]', el).onclick = function () { go('projetos'); };
  $('#editProj', el).onclick = function () { openProjectModal(p); };
@@ -853,23 +823,20 @@ function renderProjeto(el) {
 }
 function openProjectModal(proj) {
  var p = proj || {}, editing = !!proj;
- var atts = (p.attachments || []).slice();
  var userOpts = '<option value="">Sem responsável</option>' + st.users.map(function (u) { return '<option value="' + u.id + '"' + (u.id === (p.responsible_id || '') ? ' selected' : '') + '>' + esc(u.name) + '</option>'; }).join('');
  var statusOpts = ['Ativo', 'Pausado', 'Concluído'].map(function (s) { return '<option' + (s === (p.status || 'Ativo') ? ' selected' : '') + '>' + s + '</option>'; }).join('');
  openModal(editing ? 'Editar projeto' : 'Novo projeto', ic('folder'),
   '<label class="fld"><span>Nome</span><input id="pjName" value="' + esc(p.name || '') + '" placeholder="Ex.: Rebranding do site"></label>' +
   '<div class="mrow2"><label class="fld"><span>Responsável</span><select id="pjResp">' + userOpts + '</select></label>' +
   '<label class="fld"><span>Status</span><select id="pjStatus">' + statusOpts + '</select></label></div>' +
-  '<label class="fld"><span>Descrição</span><textarea id="pjDesc" rows="3">' + esc(p.description || '') + '</textarea></label>' +
-  '<div class="fld"><span>Anexos</span><div class="att-list" id="pjAtts"></div></div>',
+  '<label class="fld"><span>Descrição</span><textarea id="pjDesc" rows="3">' + esc(p.description || '') + '</textarea></label>',
   function () {
    var name = $('#pjName').value.trim(); if (!name) { toast('Informe o nome', 'err'); return false; }
-   var payload = { name: name, responsible_id: $('#pjResp').value || null, status: $('#pjStatus').value, description: $('#pjDesc').value, attachments: atts };
+   var payload = { name: name, responsible_id: $('#pjResp').value || null, status: $('#pjStatus').value, description: $('#pjDesc').value };
    var op = editing ? S.updateProject(proj.id, payload) : S.createProject(payload);
    op.then(function (np) { toast(editing ? 'Projeto salvo' : 'Projeto criado'); closeModal(); if (!editing && np) openProjeto(np.id); }).catch(function (e) { toast(e.message, 'err'); });
    return false;
   }, editing ? 'Salvar' : 'Criar projeto', editing ? '<button class="btn danger" id="pjDel">' + ic('trash', 15) + ' Excluir</button>' : '');
- attUploader($('#pjAtts'), function () { return atts; }, function (a) { atts = a; });
  if (editing) $('#pjDel').onclick = function () { if (!confirm('Excluir o projeto e todas as tarefas dele?')) return; S.deleteProject(proj.id).then(function () { toast('Projeto excluído'); closeModal(); go('projetos'); }).catch(function (e) { toast(e.message, 'err'); }); };
 }
 function openTaskModal(task, projectId) {

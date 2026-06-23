@@ -1,5 +1,6 @@
 import { sql } from '../lib/db.js';
 import { sendGroup, sendDM } from '../lib/whatsapp.js';
+import { list, del } from '@vercel/blob';
 
 const OPEN = ['Agendado', 'Em produção', 'Aguardando aprovação', 'Modificação'];
 const ICON = { 'Agendado': '🗓️', 'Em produção': '🛠️', 'Aguardando aprovação': '👀', 'Modificação': '✏️', 'Finalizado': '✅', 'Postado': '📣' };
@@ -111,6 +112,32 @@ async function digest() {
   return { pending: p.rows.length };
 }
 
+// Faxina de storage: apaga do Vercel Blob os arquivos que nenhum registro referencia
+// (uploads abandonados, posts/itens excluídos etc.). Só remove órfãos com +6h, para
+// não correr o risco de apagar algo de um upload em andamento.
+async function blobGC() {
+  const live = new Set();
+  const add = (arr) => { (arr || []).forEach((x) => { if (x && x.url) live.add(x.url); }); };
+  (await sql('select media from posts')).rows.forEach((p) => add(p.media));
+  (await sql('select attachments from meetings')).rows.forEach((m) => add(m.attachments));
+  (await sql('select attachments from projects')).rows.forEach((p) => add(p.attachments));
+  (await sql('select cover_url, avatar_url from clients')).rows.forEach((c) => { if (c.cover_url) live.add(c.cover_url); if (c.avatar_url) live.add(c.avatar_url); });
+  const cutoff = Date.now() - 6 * 3600 * 1000;
+  let cursor, deleted = 0, freed = 0;
+  do {
+    const r = await list({ cursor, limit: 1000 });
+    cursor = r.cursor;
+    for (const b of r.blobs) {
+      if (live.has(b.url)) continue;
+      const ts = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0;
+      if (ts && ts > cutoff) continue; // recente demais: pode estar em uso num modal aberto
+      try { await del(b.url); deleted++; freed += b.size || 0; } catch (e) {}
+    }
+  } while (cursor);
+  if (deleted) { try { await sql('insert into notifications (text, kind) values ($1,$2)', ['Faxina de storage: ' + deleted + ' arquivo(s) órfão(s) removido(s) (' + (freed / 1048576).toFixed(1) + ' MB)', 'info']); } catch (e) {} }
+  return { blobsDeleted: deleted, mbFreed: +(freed / 1048576).toFixed(1) };
+}
+
 // Rotina da manhã: junta tudo (cabe no limite de crons do Hobby).
 async function morning() {
   const out = {};
@@ -119,6 +146,7 @@ async function morning() {
   try { Object.assign(out, await reminder()); } catch (e) {}
   try { Object.assign(out, await finalizedReminder()); } catch (e) {}
   try { const m = await monthlyClientReminders(); out.monthly = m.reminders; } catch (e) {}
+  try { out.blobGC = await blobGC(); } catch (e) { out.blobGCErr = String(e.message || e); }
   return out;
 }
 
@@ -133,6 +161,7 @@ export default async function handler(req, res) {
     else if (job === 'reminder') r = await reminder();
     else if (job === 'overdue') r = await overdue();
     else if (job === 'finalized') r = await finalizedReminder();
+    else if (job === 'gc') r = await blobGC();
     else r = await morning();
     return res.status(200).json(r);
   } catch (e) {

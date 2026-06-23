@@ -140,6 +140,8 @@ export default async function handler(req, res) {
     if (req.method === 'DELETE') {
       const id = req.query && req.query.id;
       if (!id) return res.status(400).json({ error: 'id é obrigatório' });
+      // apaga os arquivos do Blob antes de excluir o registro
+      try { const m = await sql('select media from posts where id = $1', [id]); for (const a of ((m.rows[0] && m.rows[0].media) || [])) { if (a && a.url) { try { await del(a.url); } catch (e) {} } } } catch (e) {}
       await sql('delete from posts where id = $1', [id]);
       return res.status(200).json({ ok: true });
     }

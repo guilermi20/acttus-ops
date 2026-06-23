@@ -1,4 +1,5 @@
 import { sql, requireAuth } from '../lib/db.js';
+import { del } from '@vercel/blob';
 
 const P_STATUS = ['Ativo', 'Pausado', 'Concluído'];
 const T_STATUS = ['A fazer', 'Em andamento', 'Concluída'];
@@ -102,6 +103,7 @@ export default async function handler(req, res) {
     if (req.method === 'DELETE') {
       const id = req.query && req.query.id;
       if (!id) return res.status(400).json({ error: 'id é obrigatório' });
+      try { const m = await sql('select attachments from projects where id = $1', [id]); for (const a of ((m.rows[0] && m.rows[0].attachments) || [])) { if (a && a.url) { try { await del(a.url); } catch (e) {} } } } catch (e) {}
       await sql('delete from projects where id = $1', [id]);
       return res.status(200).json({ ok: true });
     }

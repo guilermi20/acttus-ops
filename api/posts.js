@@ -96,8 +96,9 @@ export default async function handler(req, res) {
         if (cur.rows[0]) { prevStatus = cur.rows[0].status; oldDate = cur.rows[0].pub_date; }
       }
       if (o.pub_date && oldDate && o.pub_date !== oldDate) o.date_moved = o.pub_date > oldDate ? 'adiado' : 'antecipado';
-      // virou "Postado": apaga os anexos do Blob e zera o media (economiza storage)
-      if (o.status === 'Postado') {
+      // Aprovado (Finalizado), Reprovado (Modificação) ou Publicado (Postado):
+      // apaga os arquivos do Blob e zera o media (economiza storage).
+      if (o.status === 'Postado' || o.status === 'Finalizado' || o.status === 'Modificação') {
         const m = await sql('select media from posts where id = $1', [id]);
         const media = (m.rows[0] && m.rows[0].media) || [];
         for (const att of media) { if (att && att.url) { try { await del(att.url); } catch (e) {} } }

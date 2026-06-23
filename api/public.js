@@ -3,6 +3,12 @@
 //  POST → action: 'suggest' (ideia) | 'approve' | 'reject' (de posts em aprovação)
 import { sql } from '../lib/db.js';
 import { sendGroup } from '../lib/whatsapp.js';
+import { del } from '@vercel/blob';
+
+// Apaga os arquivos (mídia) do Vercel Blob — usado ao aprovar/reprovar (economiza storage).
+async function delMedia(media) {
+  for (const a of media || []) { if (a && a.url) { try { await del(a.url); } catch (e) {} } }
+}
 
 export default async function handler(req, res) {
   const t = (req.query && req.query.t) || (req.body && req.body.t);
@@ -32,18 +38,20 @@ export default async function handler(req, res) {
       if (action === 'approve' || action === 'reject') {
         const postId = b.post_id;
         if (!postId) return res.status(400).json({ error: 'post_id ausente' });
-        const pr = await sql('select id, title, status from posts where id = $1 and client_id = $2', [postId, client.id]);
+        const pr = await sql('select id, title, status, media from posts where id = $1 and client_id = $2', [postId, client.id]);
         if (!pr.rows.length) return res.status(404).json({ error: 'Post não encontrado' });
         const post = pr.rows[0];
         if (action === 'approve') {
-          await sql("update posts set status = 'Finalizado', reject_reason = null, updated_at = now() where id = $1", [postId]);
+          await delMedia(post.media); // aprovado → apaga os arquivos do Blob
+          await sql("update posts set status = 'Finalizado', reject_reason = null, media = '[]'::jsonb, updated_at = now() where id = $1", [postId]);
           try { await sendGroup('✅ *Aprovado pelo cliente* — ' + client.name + '\n*' + post.title + '*'); } catch (e) {}
           await sql('insert into notifications (text, kind) values ($1, $2)', [client.name + ' aprovou: ' + post.title, 'approval']);
           return res.status(200).json({ ok: true, status: 'Finalizado' });
         }
         const reason = String(b.reason || '').trim();
         if (!reason) return res.status(400).json({ error: 'Informe o motivo da reprovação' });
-        await sql('update posts set status = \'Modificação\', reject_reason = $2, updated_at = now() where id = $1', [postId, reason.slice(0, 2000)]);
+        await delMedia(post.media); // reprovado → apaga os arquivos do Blob
+        await sql("update posts set status = 'Modificação', reject_reason = $2, media = '[]'::jsonb, updated_at = now() where id = $1", [postId, reason.slice(0, 2000)]);
         try { await sendGroup('❌ *Reprovado pelo cliente* — ' + client.name + '\n*' + post.title + '*\nMotivo: ' + reason); } catch (e) {}
         await sql('insert into notifications (text, kind) values ($1, $2)', [client.name + ' reprovou: ' + post.title, 'approval']);
         return res.status(200).json({ ok: true, status: 'Modificação' });

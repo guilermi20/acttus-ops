@@ -12,6 +12,7 @@ import { sql } from '../../lib/db.js';
 import { requireApiKey, applyCors } from '../../lib/apikey.js';
 import { REGISTRY } from '../../lib/apiRegistry.js';
 import { discovery, openapi } from '../../lib/apidocs.js';
+import { manageKeys } from '../../lib/manageKeys.js';
 
 const MAX_LIMIT = 200;
 const DEFAULT_LIMIT = 50;
@@ -95,10 +96,13 @@ export default async function handler(req, res) {
   const id = parts[1];
 
   try {
+    // ---- gestão de chaves (admin): rewrite /api/apikeys → /api/v1/manage-keys
+    if (resource === 'manage-keys') return manageKeys(req, res);
+
     // ---- rotas especiais ---------------------------------------------------
-    if (!resource) return sendJson(res, 200, discovery(req));
+    // (discovery = raiz /api/v1, servida via rewrite → /api/v1/discovery)
+    if (!resource || resource === 'discovery' || resource === 'docs') return sendJson(res, 200, discovery(req));
     if (resource === 'openapi.json' || resource === 'openapi') return sendJson(res, 200, openapi(req));
-    if (resource === 'docs') return sendJson(res, 200, discovery(req));
     if (resource === 'ping') {
       const key = await requireApiKey(req, res, 'read');
       if (!key) return;

@@ -89,15 +89,21 @@ export default async function handler(req, res) {
   applyCors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  // Segmentos após /api/v1 — ex.: ['posts'] ou ['posts', '<id>']
-  const seg = (req.query && req.query.resource) || [];
-  const parts = Array.isArray(seg) ? seg : [seg];
-  const resource = parts[0];
-  const id = parts[1];
+  // Roteamento a partir do CAMINHO (req.url), não do parâmetro dinâmico da Vercel:
+  // em projeto zero-config com rewrites, req.query.resource nem sempre é preenchido.
+  const rawPath = String(req.url || '').split('?')[0];
+  let path = rawPath;
+  if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
 
   try {
-    // ---- gestão de chaves (admin): rewrite /api/apikeys → /api/v1/manage-keys
-    if (resource === 'manage-keys') return manageKeys(req, res);
+    // ---- gestão de chaves (admin): /api/apikeys (rewrite) ou /api/v1/manage-keys
+    if (path === '/api/apikeys' || path.endsWith('/manage-keys') || path.endsWith('/apikeys')) return manageKeys(req, res);
+
+    // segmentos após /api/v1 — ex.: 'posts' ou 'posts/<id>'
+    const rest = path.replace(/^\/api\/v1\/?/, '');
+    const parts = rest ? rest.split('/').filter(Boolean) : [];
+    const resource = parts[0] ? decodeURIComponent(parts[0]) : '';
+    const id = parts[1] ? decodeURIComponent(parts[1]) : undefined;
 
     // ---- rotas especiais ---------------------------------------------------
     // (discovery = raiz /api/v1, servida via rewrite → /api/v1/discovery)

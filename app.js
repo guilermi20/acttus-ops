@@ -35,7 +35,9 @@ var ICONS = {
  moon:'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
  sun:'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
  eye:'<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
- send:'<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>'
+ send:'<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
+ copy:'<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+ key:'<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>'
 };
 function ic(n, s) { return '<svg class="i" width="' + (s || 18) + '" height="' + (s || 18) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[n] || ICONS.dot) + '</svg>'; }
 
@@ -91,10 +93,11 @@ var NAV = [
  { sec: 'Painel', admin: true, items: [{ key: 'dashboard', label: 'Visão geral', icon: 'dashboard' }, { key: 'funil', label: 'Funil 50/30/20', icon: 'target' }, { key: 'dashboards', label: 'Dashboards', icon: 'chart' }] },
  { sec: 'Editorial', items: [{ key: 'calendario', label: 'Calendário', icon: 'calendar' }, { key: 'posts', label: 'Posts', icon: 'grid' }, { key: 'gravacoes', label: 'Gravações', icon: 'video' }, { key: 'minhas', label: 'Minhas demandas', icon: 'check' }, { key: 'rotinas', label: 'Rotinas', icon: 'clock' }, { key: 'ideias', label: 'Banco de ideias', icon: 'zap' }] },
  { sec: 'Operação', items: [{ key: 'projetos', label: 'Projetos', icon: 'folder' }, { key: 'reunioes', label: 'Reuniões', icon: 'book' }] },
- { sec: 'Cadastros', items: [{ key: 'clientes', label: 'Clientes', icon: 'building' }, { key: 'usuarios', label: 'Usuários', icon: 'users' }] }
+ { sec: 'Cadastros', items: [{ key: 'clientes', label: 'Clientes', icon: 'building' }, { key: 'usuarios', label: 'Usuários', icon: 'users' }] },
+ { sec: 'Integrações', admin: true, items: [{ key: 'api', label: 'API & Integrações', icon: 'key' }] }
 ];
-var VIEWS = { dashboard: renderDashboard, funil: renderFunil, dashboards: renderDashboards, calendario: renderCalendario, posts: renderPosts, gravacoes: renderGravacoes, minhas: renderMinhas, rotinas: renderRotinas, ideias: renderIdeias, projetos: renderProjetos, projeto: renderProjeto, reunioes: renderReunioes, reuniao: renderReuniao, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios };
-var ADMIN_ROUTES = { dashboard: 1, funil: 1, dashboards: 1 };
+var VIEWS = { dashboard: renderDashboard, funil: renderFunil, dashboards: renderDashboards, calendario: renderCalendario, posts: renderPosts, gravacoes: renderGravacoes, minhas: renderMinhas, rotinas: renderRotinas, ideias: renderIdeias, projetos: renderProjetos, projeto: renderProjeto, reunioes: renderReunioes, reuniao: renderReuniao, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios, api: renderApiKeys };
+var ADMIN_ROUTES = { dashboard: 1, funil: 1, dashboards: 1, api: 1 };
 var route = 'calendario';
 
 function isAdmin() { return !!(st.user && st.user.role === 'admin'); }
@@ -122,6 +125,7 @@ function navCount(k) {
  if (k === 'ideias') return st.ideas.filter(function (i) { return i.status === 'nova'; }).length;
  if (k === 'clientes') return st.clients.length;
  if (k === 'usuarios') return st.users.length;
+ if (k === 'api') return st.apiKeys.filter(function (x) { return !x.revoked_at; }).length;
  return '';
 }
 function renderView() { var el = $('#view'); (VIEWS[route] || renderDashboard)(el); }
@@ -680,14 +684,24 @@ function openClientModal(cli) {
    USUÁRIOS
    =================================================================== */
 function renderUsuarios(el) {
+ if (isAdmin() && !apiKeysLoaded) { apiKeysLoaded = true; S.loadApiKeys().catch(function () {}); }
  var rows = st.users.map(function (u) {
-  return '<div class="lrow click" data-usr="' + u.id + '">' + avatar(u.name, 30) + '<div class="tx"><div class="t">' + esc(u.name) + '</div><div class="m">' + esc(u.email) + '</div></div><div class="rt"><span class="open-link">editar ' + ic('edit', 13) + '</span></div></div>';
+  var kb = '';
+  if (isAdmin()) {
+   var uk = userActiveKey(u.id);
+   if (uk && uk.key_plain) kb = '<button class="btn sm" data-copykey="' + esc(uk.key_plain) + '" title="Copiar a chave de API deste usuário">' + ic('copy', 13) + ' chave API</button>';
+   else if (uk) kb = '<span class="pill" title="Esta chave não guardou o texto — gere outra para poder copiar">chave sem cópia</span>';
+   else kb = '<button class="btn sm" data-genkey="' + u.id + '" title="Gerar uma chave de API para este usuário">' + ic('key', 13) + ' gerar chave</button>';
+  }
+  return '<div class="lrow click" data-usr="' + u.id + '">' + avatar(u.name, 30) + '<div class="tx"><div class="t">' + esc(u.name) + '</div><div class="m">' + esc(u.email) + '</div></div><div class="rt">' + kb + '<span class="open-link">editar ' + ic('edit', 13) + '</span></div></div>';
  }).join('') || '<div class="empty">Nenhum usuário ainda.</div>';
  el.innerHTML = head('Usuários', 'Quem acessa o sistema. Clique num usuário para editar. Login = CPF + email.',
   '<button class="btn pri" id="newUsr">' + ic('plus') + ' Novo usuário</button>') +
   '<div class="note">' + ic('alert', 15) + ' Cada usuário entra com o <b>CPF</b> e o <b>email</b> cadastrados aqui. Guarde esses dados.</div>' +
   '<div class="panel"><div class="bd">' + rows + '</div></div>';
  $('#newUsr', el).onclick = function () { openUserModal(null); };
+ $$('[data-copykey]', el).forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); copyText(b.getAttribute('data-copykey'), 'Chave de API copiada'); }; });
+ $$('[data-genkey]', el).forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); openApiKeyModal(findUser(b.getAttribute('data-genkey'))); }; });
  $$('[data-usr]', el).forEach(function (r) { r.onclick = function () { var id = r.getAttribute('data-usr'), u = null; for (var i = 0; i < st.users.length; i++) if (st.users[i].id === id) u = st.users[i]; if (u) openUserModal(u); }; });
 }
 function openUserModal(user) {
@@ -709,6 +723,132 @@ function openUserModal(user) {
    return false;
   }, editing ? 'Salvar' : 'Criar usuário', (editing && user.id !== (st.user && st.user.id)) ? '<button class="btn danger" id="uDel">' + ic('trash', 15) + ' Excluir</button>' : '');
  if (editing) { var ud = $('#uDel'); if (ud) ud.onclick = function () { if (!confirm('Excluir este usuário? As rotinas dele também serão removidas.')) return; S.deleteUser(user.id).then(function () { toast('Usuário excluído'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); }); }; }
+}
+
+/* ===================================================================
+   API & INTEGRAÇÕES (chaves de API + documentação)
+   =================================================================== */
+var apiKeysLoaded = false;
+function findUser(id) { for (var i = 0; i < st.users.length; i++) if (st.users[i].id === id) return st.users[i]; return null; }
+function userActiveKey(userId) { var l = st.apiKeys || []; for (var i = 0; i < l.length; i++) if (l[i].user_id === userId && !l[i].revoked_at) return l[i]; return null; }
+function fmtWhen(iso) { if (!iso) return 'nunca'; try { var d = new Date(iso); return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); } catch (e) { return String(iso).slice(0, 16).replace('T', ' '); } }
+function copyText(text, okMsg) {
+ if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { toast(okMsg || 'Copiado'); }).catch(function () { prompt(okMsg || 'Copie:', text); });
+ else prompt(okMsg || 'Copie:', text);
+}
+
+function renderApiKeys(el) {
+ if (!apiKeysLoaded) { apiKeysLoaded = true; S.loadApiKeys().catch(function (e) { toast(e.message, 'err'); }); }
+ var base = location.origin + '/api/v1';
+ var keys = st.apiKeys || [];
+ var rows = keys.map(function (k) {
+  var rev = !!k.revoked_at;
+  var meta = esc(k.key_prefix) + '… · ' + esc((k.scopes || []).join(' + ')) + ' · ' + k.rate_limit + '/min' + (k.user_name ? (' · ' + esc(k.user_name)) : '') + ' · usada: ' + esc(fmtWhen(k.last_used_at));
+  return '<div class="lrow' + (rev ? ' off' : '') + '"><span class="mic2">' + ic('key', 16) + '</span><div class="tx"><div class="t">' + esc(k.name) + (rev ? ' <span class="pill">revogada</span>' : '') + '</div><div class="m">' + meta + '</div></div><div class="rt">' +
+   (k.key_plain && !rev ? '<button class="btn sm" data-copykey="' + esc(k.key_plain) + '">' + ic('copy', 13) + ' copiar</button>' : '') +
+   (!rev ? '<button class="iconbtn danger" data-revkey="' + k.id + '" title="Revogar chave">' + ic('trash', 15) + '</button>' : '') +
+   '</div></div>';
+ }).join('') || '<div class="empty">Nenhuma chave ainda. Crie a primeira em "Nova chave".</div>';
+
+ el.innerHTML = head('API & Integrações', 'Plugue o Acttus OS em ferramentas externas (Zapier, Make, n8n, Custom GPT). Acesso por chave de API.',
+  '<button class="btn pri" id="newKey">' + ic('plus') + ' Nova chave</button>') +
+  '<div class="panel"><div class="hd"><h3>Chaves de API</h3></div><div class="bd">' + rows + '</div></div>' +
+  apiDocHtml(base);
+
+ var nk = $('#newKey', el); if (nk) nk.onclick = function () { openApiKeyModal(null); };
+ $$('[data-copykey]', el).forEach(function (b) { b.onclick = function () { copyText(b.getAttribute('data-copykey'), 'Chave copiada'); }; });
+ $$('[data-copy]', el).forEach(function (b) { b.onclick = function () { copyText(b.getAttribute('data-copy'), 'Copiado'); }; });
+ $$('[data-revkey]', el).forEach(function (b) { b.onclick = function () { if (!confirm('Revogar esta chave? Integrações que a usam param na hora.')) return; S.revokeApiKey(b.getAttribute('data-revkey')).then(function () { toast('Chave revogada'); }).catch(function (e) { toast(e.message, 'err'); }); }; });
+}
+
+function openApiKeyModal(presetUser) {
+ var userOpts = '<option value="">— nenhum (chave de integração)</option>' + st.users.map(function (u) { return '<option value="' + u.id + '"' + (presetUser && presetUser.id === u.id ? ' selected' : '') + '>' + esc(u.name) + '</option>'; }).join('');
+ var defName = presetUser ? ('Chave de ' + presetUser.name) : '';
+ openModal('Nova chave de API', ic('key'),
+  '<label class="fld"><span>Nome</span><input id="kName" value="' + esc(defName) + '" placeholder="Ex.: Zapier, n8n, Chave do Bigode"></label>' +
+  '<label class="fld"><span>Vincular a um usuário (opcional — permite copiar a chave depois)</span><select id="kUser">' + userOpts + '</select></label>' +
+  '<div class="fld"><span>Permissões</span><div class="krow"><label class="chk"><input type="checkbox" checked disabled> Leitura</label><label class="chk"><input type="checkbox" id="kWrite"' + (presetUser ? ' checked' : '') + '> Escrita (criar/editar/excluir)</label></div></div>' +
+  '<label class="fld"><span>Limite de requisições por minuto (0 = ilimitado)</span><input id="kRate" type="number" value="120" min="0"></label>' +
+  '<div class="note">' + ic('alert', 15) + ' A chave aparece completa ao criar. Se vinculada a um usuário, fica salva para você copiar de novo aqui.</div>',
+  function () {
+   var name = $('#kName').value.trim(), user_id = $('#kUser').value || null;
+   var scopes = ['read']; if ($('#kWrite').checked) scopes.push('write');
+   var rate = parseInt($('#kRate').value, 10); if (!isFinite(rate) || rate < 0) rate = 120;
+   if (!name && !user_id) { toast('Dê um nome à chave', 'err'); return false; }
+   S.createApiKey({ name: name, user_id: user_id, scopes: scopes, rate_limit: rate, store_plain: !!user_id })
+    .then(function (k) { closeModal(); showKeyModal(k); })
+    .catch(function (e) { toast(e.message, 'err'); });
+   return false;
+  }, 'Criar chave');
+}
+
+function showKeyModal(k) {
+ openModal('Chave criada', ic('key'),
+  '<div class="note">' + ic('check', 15) + ' Copie e guarde a chave abaixo. ' + (k.user_id ? 'Ela também fica salva aqui para re-copiar.' : 'Ela <b>não</b> será mostrada de novo.') + '</div>' +
+  '<label class="fld"><span>Chave de API</span><input id="kShow" readonly value="' + esc(k.key) + '" class="mono"></label>' +
+  '<div class="krow"><button type="button" class="btn pri" id="kCopy">' + ic('copy', 14) + ' Copiar chave</button></div>',
+  function () { closeModal(); return false; }, 'Fechar');
+ var c = $('#kCopy'); if (c) c.onclick = function () { copyText(k.key, 'Chave copiada'); };
+ var s = $('#kShow'); if (s) s.onclick = function () { this.select(); };
+}
+
+// Documentação da API renderizada dentro do app (mesmo conteúdo do API.md, resumido).
+function apiDocHtml(base) {
+ var res = [
+  ['posts', 'Publicações do calendário', 'client_id, status, funnel_stage, post_type, channel, kind, responsible_id, from, to', '✅'],
+  ['clients', 'Clientes', 'is_internal', '✅'],
+  ['ideas', 'Banco de ideias', 'client_id, status, source', '✅'],
+  ['projects', 'Projetos internos', 'status, responsible_id', '✅'],
+  ['project-tasks', 'Tarefas de projeto', 'project_id, responsible_id, status', '✅'],
+  ['meetings', 'Reuniões / atas', 'category, from, to', '✅'],
+  ['routines', 'Rotinas', 'owner_id, done', '✅'],
+  ['users', 'Equipe (sem CPF)', 'role', '— (só leitura)'],
+  ['notifications', 'Notificações', 'kind', '— (só leitura)']
+ ].map(function (r) { return '<tr><td><code>' + r[0] + '</code></td><td>' + esc(r[1]) + '</td><td class="mono sm2">' + esc(r[2]) + '</td><td>' + r[3] + '</td></tr>'; }).join('');
+
+ var curlList = 'curl -H "X-Api-Key: SUA_CHAVE" \\\n  "' + base + '/posts?status=Postado&limit=20"';
+ var curlCreate = 'curl -X POST "' + base + '/posts" \\\n  -H "X-Api-Key: SUA_CHAVE" -H "Content-Type: application/json" \\\n  -d \'{"title":"Reels de lançamento","funnel_stage":"topo","post_type":"reels","pub_date":"2026-07-10","pub_time":"18:00"}\'';
+ var curlPatch = 'curl -X PATCH "' + base + '/posts/ID_DO_POST" \\\n  -H "X-Api-Key: SUA_CHAVE" -H "Content-Type: application/json" \\\n  -d \'{"status":"Finalizado"}\'';
+ var curlDelete = 'curl -X DELETE "' + base + '/ideas/ID" -H "X-Api-Key: SUA_CHAVE"';
+
+ return '<div class="panel apidoc"><div class="hd"><h3>' + ic('book', 16) + ' Documentação da API</h3></div><div class="bd">' +
+
+  '<h4>1. Autenticação</h4>' +
+  '<p>Toda requisição leva sua chave no header <code>X-Api-Key</code> (ou <code>Authorization: Bearer</code>). Escopos: <b>read</b> (GET) e <b>write</b> (POST/PATCH/DELETE).</p>' +
+  '<div class="kv2"><span>Base URL</span><code class="mono">' + esc(base) + '</code><button class="btn sm" data-copy="' + esc(base) + '">' + ic('copy', 12) + '</button></div>' +
+  '<div class="kv2"><span>Header</span><code class="mono">X-Api-Key: SUA_CHAVE</code><button class="btn sm" data-copy="X-Api-Key: SUA_CHAVE">' + ic('copy', 12) + '</button></div>' +
+
+  '<h4>2. Endpoints</h4>' +
+  '<table class="tbl"><thead><tr><th>Método / Rota</th><th>O que faz</th></tr></thead><tbody>' +
+  '<tr><td class="mono">GET /ping</td><td>valida a chave, devolve nome + escopos</td></tr>' +
+  '<tr><td class="mono">GET /openapi.json</td><td>spec para importar em ferramentas</td></tr>' +
+  '<tr><td class="mono">GET /{recurso}</td><td>lista (filtros + <code>?limit=</code>/<code>?offset=</code>)</td></tr>' +
+  '<tr><td class="mono">GET /{recurso}/{id}</td><td>detalhe de um item</td></tr>' +
+  '<tr><td class="mono">POST /{recurso}</td><td>cria (escopo write)</td></tr>' +
+  '<tr><td class="mono">PATCH /{recurso}/{id}</td><td>atualiza (escopo write)</td></tr>' +
+  '<tr><td class="mono">DELETE /{recurso}/{id}</td><td>exclui (escopo write)</td></tr>' +
+  '</tbody></table>' +
+
+  '<h4>3. Recursos disponíveis</h4>' +
+  '<table class="tbl"><thead><tr><th>Recurso</th><th>Conteúdo</th><th>Filtros</th><th>Escrita</th></tr></thead><tbody>' + res + '</tbody></table>' +
+
+  '<h4>4. Exemplos</h4>' +
+  '<div class="ex"><div class="exh">Listar posts postados<button class="btn sm" data-copy="' + esc(curlList) + '">' + ic('copy', 12) + ' copiar</button></div><pre class="code">' + esc(curlList) + '</pre></div>' +
+  '<div class="ex"><div class="exh">Criar um post<button class="btn sm" data-copy="' + esc(curlCreate) + '">' + ic('copy', 12) + ' copiar</button></div><pre class="code">' + esc(curlCreate) + '</pre></div>' +
+  '<div class="ex"><div class="exh">Mudar status<button class="btn sm" data-copy="' + esc(curlPatch) + '">' + ic('copy', 12) + ' copiar</button></div><pre class="code">' + esc(curlPatch) + '</pre></div>' +
+  '<div class="ex"><div class="exh">Excluir<button class="btn sm" data-copy="' + esc(curlDelete) + '">' + ic('copy', 12) + ' copiar</button></div><pre class="code">' + esc(curlDelete) + '</pre></div>' +
+
+  '<h4>5. Plugar em ferramentas</h4>' +
+  '<p>No n8n, Make, Postman ou <b>Custom GPT Actions</b>: importe a spec e configure a chave como <i>API Key no header</i> <code>X-Api-Key</code>.</p>' +
+  '<div class="kv2"><span>OpenAPI</span><code class="mono">' + esc(base) + '/openapi.json</code><button class="btn sm" data-copy="' + esc(base + '/openapi.json') + '">' + ic('copy', 12) + '</button><a class="btn sm" href="' + esc(base + '/openapi.json') + '" target="_blank" rel="noopener">' + ic('eye', 12) + ' abrir</a></div>' +
+
+  '<h4>6. Convenções & segurança</h4>' +
+  '<ul class="dl"><li>Listas: <code>{ "data": [...], "meta": { limit, offset, count } }</code>. Item: <code>{ "data": {...} }</code>. Erro: <code>{ "error": "..." }</code>.</li>' +
+  '<li>Paginação: <code>?limit=</code> (padrão 50, máx 200) e <code>?offset=</code>.</li>' +
+  '<li>Rate limit por chave (padrão 120/min); headers <code>X-RateLimit-*</code> e HTTP 429 quando estoura.</li>' +
+  '<li>O CPF dos usuários nunca é exposto. Revogar uma chave a desativa na hora.</li></ul>' +
+
+  '</div></div>';
 }
 
 /* ===================================================================
@@ -1140,6 +1280,7 @@ var booted = false;
 function boot() {
  return S.loadAll().then(function () {
   if (!booted) { S.subscribe(onStoreChange); S.startPolling(); booted = true; }
+  if (isAdmin()) { apiKeysLoaded = true; S.loadApiKeys().catch(function () {}); }
   showApp();
  }).catch(function (e) {
   if (String(e.message).indexOf('Sessão') >= 0 || !S.isAuthed()) { showLogin(); }

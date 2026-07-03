@@ -7,7 +7,7 @@
   var state = {
     token: localStorage.getItem(TOKEN_KEY) || null,
     user: null,
-    clients: [], users: [], posts: [], notifications: [], meetings: [], routines: [], projects: [], projectTasks: [], ideas: [],
+    clients: [], users: [], posts: [], notifications: [], meetings: [], routines: [], projects: [], projectTasks: [], ideas: [], apiKeys: [],
     serverNow: null, sig: '', loaded: false
   };
   try { state.user = JSON.parse(localStorage.getItem(USER_KEY) || 'null'); } catch (e) {}
@@ -126,6 +126,11 @@
   function updateMeeting(id, b) { return req('PATCH', '/api/meetings?id=' + encodeURIComponent(id), b).then(function (m) { var i = -1; for (var k = 0; k < state.meetings.length; k++) if (state.meetings[k].id === id) { i = k; break; } if (i >= 0) state.meetings[i] = m; else state.meetings.unshift(m); emit(); return m; }); }
   function deleteMeeting(id) { return req('DELETE', '/api/meetings?id=' + encodeURIComponent(id)).then(function () { state.meetings = state.meetings.filter(function (m) { return m.id !== id; }); emit(); }); }
 
+  // Chaves de API (só admin; carregadas sob demanda — não entram no loadAll p/ não quebrar não-admins)
+  async function loadApiKeys() { var r = await req('GET', '/api/apikeys'); state.apiKeys = (r && r.keys) || []; emit(); return state.apiKeys; }
+  function createApiKey(b) { return req('POST', '/api/apikeys', b).then(function (k) { return loadApiKeys().then(function () { return k; }); }); }
+  function revokeApiKey(id) { return req('DELETE', '/api/apikeys?id=' + encodeURIComponent(id)).then(function () { return loadApiKeys(); }); }
+
   var pollTimer = null;
   function startPolling() {
     stopPolling();
@@ -146,6 +151,7 @@
     createProject: createProject, updateProject: updateProject, deleteProject: deleteProject,
     createProjectTask: createProjectTask, updateProjectTask: updateProjectTask, deleteProjectTask: deleteProjectTask,
     allRoutines: allRoutines,
+    loadApiKeys: loadApiKeys, createApiKey: createApiKey, revokeApiKey: revokeApiKey,
     startPolling: startPolling, stopPolling: stopPolling,
     isAuthed: function () { return !!state.token; }
   };

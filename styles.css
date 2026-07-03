@@ -481,3 +481,26 @@ img.pp-media.zoomable{cursor:zoom-in}
 .cal-cell.over{border-color:var(--yellow);box-shadow:0 0 0 2px var(--yellow-soft);background:var(--yellow-soft)}
 .note.rej{border-color:rgba(232,103,94,.45);background:var(--red-soft)}
 .note.rej .i{color:var(--red)}
+
+/* ===== API & Integrações ===== */
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+.lrow.off{opacity:.5}
+.lrow .mic2{width:30px;height:30px;border-radius:9px;background:var(--yellow-soft);color:var(--yellow);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.pill{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--mut);background:var(--panel3);border:1px solid var(--line2);border-radius:20px;padding:2px 8px;vertical-align:middle}
+.krow{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:2px}
+.kv2{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0}
+.kv2>span{font-size:12px;font-weight:700;color:var(--mut2);min-width:70px}
+.kv2 code{background:var(--panel2);border:1px solid var(--line2);border-radius:8px;padding:6px 10px;color:var(--ink2);overflow:auto}
+/* documentação */
+.apidoc .bd{padding:6px 18px 18px}
+.apidoc h4{font-size:14px;font-weight:700;margin:20px 0 8px;color:var(--ink);border-top:1px solid var(--line2);padding-top:16px}
+.apidoc h4:first-of-type{border-top:0;padding-top:4px;margin-top:6px}
+.apidoc p{color:var(--ink2);font-size:13px;margin:4px 0 8px}
+.apidoc code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;background:var(--panel2);border:1px solid var(--line2);border-radius:6px;padding:1px 6px;color:var(--yellow)}
+.apidoc .tbl td .mono,.apidoc .sm2{font-size:11.5px;color:var(--mut)}
+.apidoc .tbl code{color:var(--ink)}
+.apidoc .dl{margin:4px 0 4px 18px;color:var(--ink2);font-size:13px}
+.apidoc .dl li{margin:5px 0}
+.apidoc .ex{margin:10px 0}
+.apidoc .exh{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;font-weight:600;color:var(--ink2);margin-bottom:5px}
+.code{background:var(--sb);border:1px solid var(--line2);border-radius:10px;padding:12px 14px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:var(--ink2);white-space:pre;line-height:1.6;margin:0}

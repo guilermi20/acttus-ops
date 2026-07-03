@@ -9,7 +9,8 @@
   },
   "scripts": {
     "dev": "vercel dev",
-    "db:setup": "node --env-file=.env.local scripts/db-setup.js"
+    "db:setup": "node --env-file=.env.local scripts/db-setup.js",
+    "key:create": "node --env-file=.env.local scripts/create-api-key.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.5",

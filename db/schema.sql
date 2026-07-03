@@ -120,5 +120,27 @@ create table if not exists project_tasks (
   updated_at timestamptz not null default now()
 );
 
+-- Chaves de API para integrações externas (Zapier, Make, n8n, etc.).
+-- A chave completa é mostrada só na criação; guardamos apenas o hash (sha256).
+create table if not exists api_keys (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  key_prefix text not null,
+  key_hash text not null unique,
+  key_plain text,
+  user_id uuid references users(id) on delete cascade,
+  scopes jsonb not null default '["read"]',
+  rate_limit int not null default 120,
+  rate_count int not null default 0,
+  rate_window_start timestamptz,
+  last_used_at timestamptz,
+  revoked_at timestamptz,
+  created_by uuid references users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists api_keys_hash_idx on api_keys(key_hash);
+create index if not exists api_keys_active_idx on api_keys(revoked_at);
+create index if not exists api_keys_user_idx on api_keys(user_id);
+
 -- Observação: updated_at é setado explicitamente no UPDATE (api/*.js),
 -- evitando trigger/plpgsql para o schema poder ser aplicado statement-a-statement.

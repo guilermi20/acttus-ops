@@ -78,6 +78,17 @@ e depois ajuste/remova os de exemplo.
 - **Usuários/Clientes**: cadastro próprio. O dropdown de responsável puxa os usuários automaticamente.
 - **WhatsApp**: cron diário envia ao grupo o resumo das tarefas vencidas.
 
+## API pública (integrações externas)
+O app é plugável via **API por chave** (`/api/v1/*`) — para Zapier, Make, n8n, Custom GPT, etc.
+Leitura e escrita dos conteúdos (posts, clientes, ideias, projetos, reuniões, rotinas…),
+autenticada por `X-Api-Key`. Documentação completa e exemplos em [`API.md`](API.md).
+
+Início rápido:
+```bash
+npm run key:create -- "n8n produção" read,write         # cria a 1ª chave
+curl -H "X-Api-Key: act_live_xxx" https://SEU-DOMINIO.vercel.app/api/v1/ping
+```
+
 ## Testar o WhatsApp manualmente
 ```bash
 curl "https://SEU-DOMINIO.vercel.app/api/cron/overdue?secret=SEU_CRON_SECRET"

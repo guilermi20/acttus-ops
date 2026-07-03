@@ -1,6 +1,8 @@
-// Gateway público da API do Acttus OS — /api/v1/*
-// Rota curinga (catch-all) da Vercel: um só arquivo atende todos os recursos.
-//   GET    /api/v1                 → descoberta (via api/v1/index.js)
+// Gateway público da API do Acttus OS.
+// Função PLANA (não catch-all): os rewrites do vercel.json funilam para cá e
+// passam o caminho em ?__vpath= — evita a captura de rota dinâmica, que em
+// projeto zero-config da Vercel falha para rotas aninhadas (/{recurso}/{id}).
+//   GET    /api/v1                 → descoberta
 //   GET    /api/v1/ping            → valida a chave
 //   GET    /api/v1/openapi.json    → spec p/ importar em ferramentas (sem chave)
 //   GET    /api/v1/{recurso}       → lista (escopo read)
@@ -8,14 +10,17 @@
 //   POST   /api/v1/{recurso}       → cria (escopo write)
 //   PATCH  /api/v1/{recurso}/{id}  → atualiza (escopo write)
 //   DELETE /api/v1/{recurso}/{id}  → exclui (escopo write)
-import { sql } from '../../lib/db.js';
-import { requireApiKey, applyCors } from '../../lib/apikey.js';
-import { REGISTRY } from '../../lib/apiRegistry.js';
-import { discovery, openapi } from '../../lib/apidocs.js';
-import { manageKeys } from '../../lib/manageKeys.js';
+//   /api/apikeys                   → gestão de chaves (admin, via rewrite)
+import { sql } from '../lib/db.js';
+import { requireApiKey, applyCors } from '../lib/apikey.js';
+import { REGISTRY } from '../lib/apiRegistry.js';
+import { discovery, openapi } from '../lib/apidocs.js';
+import { manageKeys } from '../lib/manageKeys.js';
 
 const MAX_LIMIT = 200;
 const DEFAULT_LIMIT = 50;
+
+function dec(s) { try { return decodeURIComponent(s); } catch (e) { return s; } }
 
 // Monta o WHERE a partir dos filtros aceitos pelo recurso e da querystring.
 // Exportado (além do handler default) só para testes — a Vercel usa só o default.
@@ -89,24 +94,22 @@ export default async function handler(req, res) {
   applyCors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  // Roteamento a partir do CAMINHO (req.url), não do parâmetro dinâmico da Vercel:
-  // em projeto zero-config com rewrites, req.query.resource nem sempre é preenchido.
-  const rawPath = String(req.url || '').split('?')[0];
-  let path = rawPath;
-  if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
+  // Caminho: em produção vem do rewrite (?__vpath=posts/ID); local cai no req.url.
+  let vpath = req.query && req.query.__vpath;
+  if (vpath == null) {
+    let p = String(req.url || '').split('?')[0];
+    if (p === '/api/apikeys' || p.endsWith('/apikeys')) vpath = 'manage-keys';
+    else vpath = p.replace(/^\/api\/(?:v1|gateway)\/?/, '');
+  }
+  const parts = String(vpath || '').split('/').filter(Boolean);
+  const resource = parts[0] ? dec(parts[0]) : '';
+  const id = parts[1] ? dec(parts[1]) : undefined;
 
   try {
-    // ---- gestão de chaves (admin): /api/apikeys (rewrite) ou /api/v1/manage-keys
-    if (path === '/api/apikeys' || path.endsWith('/manage-keys') || path.endsWith('/apikeys')) return manageKeys(req, res);
-
-    // segmentos após /api/v1 — ex.: 'posts' ou 'posts/<id>'
-    const rest = path.replace(/^\/api\/v1\/?/, '');
-    const parts = rest ? rest.split('/').filter(Boolean) : [];
-    const resource = parts[0] ? decodeURIComponent(parts[0]) : '';
-    const id = parts[1] ? decodeURIComponent(parts[1]) : undefined;
+    // ---- gestão de chaves (admin): rewrite /api/apikeys → ?__vpath=manage-keys
+    if (resource === 'manage-keys') return manageKeys(req, res);
 
     // ---- rotas especiais ---------------------------------------------------
-    // (discovery = raiz /api/v1, servida via rewrite → /api/v1/discovery)
     if (!resource || resource === 'discovery' || resource === 'docs') return sendJson(res, 200, discovery(req));
     if (resource === 'openapi.json' || resource === 'openapi') return sendJson(res, 200, openapi(req));
     if (resource === 'ping') {

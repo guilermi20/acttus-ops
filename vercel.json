@@ -3,8 +3,9 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    { "source": "/api/v1", "destination": "/api/v1/discovery" },
-    { "source": "/api/apikeys", "destination": "/api/v1/manage-keys" }
+    { "source": "/api/apikeys", "destination": "/api/gateway?__vpath=manage-keys" },
+    { "source": "/api/v1", "destination": "/api/gateway" },
+    { "source": "/api/v1/:path*", "destination": "/api/gateway?__vpath=:path*" }
   ],
   "headers": [
     {

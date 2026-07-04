@@ -504,3 +504,29 @@ img.pp-media.zoomable{cursor:zoom-in}
 .apidoc .ex{margin:10px 0}
 .apidoc .exh{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;font-weight:600;color:var(--ink2);margin-bottom:5px}
 .code{background:var(--sb);border:1px solid var(--line2);border-radius:10px;padding:12px 14px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:var(--ink2);white-space:pre;line-height:1.6;margin:0}
+
+/* ===== Tutorial de conexão do MCP ===== */
+.apidoc code.mute{color:var(--mut2);background:transparent;border-color:transparent}
+.mcp-vals{margin:10px 0 6px}
+.mcp-shot{display:flex;gap:10px;align-items:stretch;flex-wrap:nowrap;overflow-x:auto;background:var(--sb);border:1px solid var(--line2);border-radius:12px;padding:14px;margin:8px 0}
+.mcp-menu{background:var(--sb2);border:1px solid var(--line2);border-radius:10px;padding:6px;min-width:190px;flex:0 0 auto}
+.mcp-mh{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut2);padding:5px 8px 7px}
+.mcp-mi{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 9px;border-radius:7px;font-size:12.5px;color:var(--ink2);white-space:nowrap}
+.mcp-mi .mcp-ar{color:var(--mut2);font-weight:700}
+.mcp-mi.hot{background:var(--yellow-soft);outline:2px solid var(--yellow);color:var(--ink);font-weight:700}
+.mcp-mi.hot .mcp-ar{color:var(--yellow)}
+.mcp-mi.mute{color:var(--mut2);font-size:11px;white-space:normal}
+.mcp-arw{align-self:center;color:var(--yellow);display:flex;flex:0 0 auto}
+.mcp-arw .i{color:var(--yellow)}
+.mcp-modal{background:var(--panel);border:1px solid var(--line2);border-radius:12px;padding:14px;width:320px;max-width:100%;flex:0 0 auto;box-shadow:var(--sh-md)}
+.mcp-mt{font-weight:700;font-size:13px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.mcp-f{margin-bottom:9px}
+.mcp-f label{display:block;font-size:11px;color:var(--mut);margin-bottom:4px}
+.mcp-in{border:1px solid var(--line2);background:var(--panel2);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mcp-in.hot{border-color:var(--yellow);box-shadow:0 0 0 3px var(--yellow-soft);color:var(--ink);font-weight:600}
+.mcp-in.mute{color:var(--mut2);font-style:italic}
+.mcp-adv{font-size:11px;color:var(--mut);margin:12px 0 8px;border-top:1px solid var(--line2);padding-top:10px}
+.mcp-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.mcp-bt{font-size:12px;font-weight:600;padding:7px 14px;border-radius:8px;border:1px solid var(--line2);color:var(--ink2)}
+.mcp-bt.pri{background:var(--yellow);color:var(--yellow-ink);border-color:var(--yellow)}
+.mcp-bt.hot{box-shadow:0 0 0 3px var(--yellow-soft)}

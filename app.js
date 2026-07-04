@@ -738,6 +738,7 @@ function copyText(text, okMsg) {
 }
 
 function renderApiKeys(el) {
+ if (!isAdmin()) { go('calendario'); return; } // página só para administradores
  if (!apiKeysLoaded) { apiKeysLoaded = true; S.loadApiKeys().catch(function (e) { toast(e.message, 'err'); }); }
  var base = location.origin + '/api/v1';
  var keys = st.apiKeys || [];
@@ -750,9 +751,10 @@ function renderApiKeys(el) {
    '</div></div>';
  }).join('') || '<div class="empty">Nenhuma chave ainda. Crie a primeira em "Nova chave".</div>';
 
- el.innerHTML = head('API & Integrações', 'Plugue o Acttus OS em ferramentas externas (Zapier, Make, n8n, Custom GPT). Acesso por chave de API.',
+ el.innerHTML = head('API & Integrações', 'Plugue o Acttus OS no Claude (MCP) e em ferramentas externas (Zapier, Make, n8n, Custom GPT). Acesso por chave de API.',
   '<button class="btn pri" id="newKey">' + ic('plus') + ' Nova chave</button>') +
   '<div class="panel"><div class="hd"><h3>Chaves de API</h3></div><div class="bd">' + rows + '</div></div>' +
+  mcpTutorialHtml() +
   apiDocHtml(base);
 
  var nk = $('#newKey', el); if (nk) nk.onclick = function () { openApiKeyModal(null); };
@@ -790,6 +792,76 @@ function showKeyModal(k) {
   function () { closeModal(); return false; }, 'Fechar');
  var c = $('#kCopy'); if (c) c.onclick = function () { copyText(k.key, 'Chave copiada'); };
  var s = $('#kShow'); if (s) s.onclick = function () { this.select(); };
+}
+
+// Tutorial de conexão do MCP no claude.ai (passos + mockups + valores prontos p/ copiar).
+var MCP_URL = 'https://acttus-mcp.torresgw1.workers.dev/mcp';
+var MCP_NAME = 'Acttus OS';
+function mcpMenuItem(label, hot, arrow) {
+ return '<div class="mcp-mi' + (hot ? ' hot' : '') + '">' + esc(label) + (arrow ? '<span class="mcp-ar">›</span>' : '') + '</div>';
+}
+function mcpMockMenu() {
+ return '<div class="mcp-shot">' +
+  '<div class="mcp-menu"><div class="mcp-mh">Mensagem &nbsp;+</div>' +
+   mcpMenuItem('Adicionar arquivos ou fotos', false, false) +
+   mcpMenuItem('Habilidades', false, true) +
+   mcpMenuItem('Conectores', true, true) +
+   mcpMenuItem('Plugins', false, true) + '</div>' +
+  '<div class="mcp-arw">' + ic('right', 16) + '</div>' +
+  '<div class="mcp-menu"><div class="mcp-mh">Conectores</div>' +
+   mcpMenuItem('Adicionar conector', true, true) +
+   mcpMenuItem('Gerenciar conectores', false, false) +
+   '<div class="mcp-mi mute">Canva · ClickUp · Google Drive…</div></div>' +
+  '<div class="mcp-arw">' + ic('right', 16) + '</div>' +
+  '<div class="mcp-menu"><div class="mcp-mh">Adicionar conector</div>' +
+   mcpMenuItem('Navegar conectores', false, false) +
+   mcpMenuItem('Adicionar conector personalizado', true, false) + '</div>' +
+ '</div>';
+}
+function mcpMockForm() {
+ return '<div class="mcp-shot"><div class="mcp-modal">' +
+  '<div class="mcp-mt">Adicionar conector personalizado <span class="pill">BETA</span></div>' +
+  '<div class="mcp-f"><label>Nome</label><div class="mcp-in hot">' + esc(MCP_NAME) + '</div></div>' +
+  '<div class="mcp-f"><label>URL do servidor MCP remoto</label><div class="mcp-in hot mono">' + esc(MCP_URL) + '</div></div>' +
+  '<div class="mcp-adv">▾ Configurações avançadas</div>' +
+  '<div class="mcp-f"><label>ID do Cliente OAuth (opcional)</label><div class="mcp-in mute">— deixe em branco —</div></div>' +
+  '<div class="mcp-f"><label>Client Secret OAuth (opcional)</label><div class="mcp-in mute">— deixe em branco —</div></div>' +
+  '<div class="mcp-btns"><span class="mcp-bt">Cancelar</span><span class="mcp-bt pri hot">Adicionar</span></div>' +
+ '</div></div>';
+}
+function mcpTutorialHtml() {
+ return '<div class="panel apidoc mcp"><div class="hd"><h3>' + ic('zap', 16) + ' Conectar no Claude (claude.ai) via MCP</h3></div><div class="bd">' +
+
+  '<p>O MCP transforma esta API num <b>conector do Claude</b>: no chat, o Claude passa a ler e escrever no Acttus OS — ver a agenda e o board, montar o calendário do mês de um cliente, resumir o que foi publicado, adicionar ideias, etc. A conexão é <b>por chave de API</b> (você cola uma das chaves de cima quando o Claude pedir).</p>' +
+
+  '<div class="mcp-vals">' +
+   '<div class="kv2"><span>Nome</span><code class="mono">' + esc(MCP_NAME) + '</code><button class="btn sm" data-copy="' + esc(MCP_NAME) + '">' + ic('copy', 12) + ' copiar</button></div>' +
+   '<div class="kv2"><span>URL do servidor MCP remoto</span><code class="mono">' + esc(MCP_URL) + '</code><button class="btn sm" data-copy="' + esc(MCP_URL) + '">' + ic('copy', 12) + ' copiar</button></div>' +
+   '<div class="kv2"><span>ID do Cliente OAuth</span><code class="mono mute">deixe em branco</code></div>' +
+   '<div class="kv2"><span>Client Secret OAuth</span><code class="mono mute">deixe em branco</code></div>' +
+  '</div>' +
+
+  '<h4>Passo 1 — abrir “Adicionar conector personalizado”</h4>' +
+  '<p>No Claude, clique no <b>+</b> (abaixo do campo de mensagem) → <b>Conectores</b> → <b>Adicionar conector</b> → <b>Adicionar conector personalizado</b> (destacados abaixo).</p>' +
+  mcpMockMenu() +
+
+  '<h4>Passo 2 — preencher o formulário</h4>' +
+  '<p>Cole o <b>Nome</b> e a <b>URL</b> (botões acima). Abra <b>Configurações avançadas</b> e deixe <b>ID do Cliente OAuth</b> e <b>Client Secret OAuth</b> <b>vazios</b>. Clique em <b>Adicionar</b>.</p>' +
+  mcpMockForm() +
+
+  '<h4>Passo 3 — autorizar com sua chave</h4>' +
+  '<p>O Claude abre uma tela do Acttus pedindo sua <b>chave de API</b>. Cole uma das chaves da tabela lá em cima (ou crie em <b>Nova chave</b>) e confirme. Pronto — as ferramentas <code>acttus_*</code> aparecem no chat.</p>' +
+  '<div class="note">' + ic('alert', 15) + ' A chave define o poder do conector: use uma chave <b>só‑leitura</b> se não quiser que o Claude altere dados; <b>read+write</b> para criar/editar/agendar.</div>' +
+
+  '<h4>Depois de conectado, é só pedir</h4>' +
+  '<ul class="dl">' +
+   '<li>“Monta o calendário de julho do cliente Fulano: [lista de posts]” → cria tudo de uma vez</li>' +
+   '<li>“O que foi publicado mês passado do cliente Fulano?” → resumo pra não repetir tema</li>' +
+   '<li>“Como está o board do cliente X?” · “O que está atrasado?” · “Agenda dessa semana”</li>' +
+   '<li>“Adiciona essas ideias no <b>banco de ideias</b> do cliente X” (separado do calendário)</li>' +
+  '</ul>' +
+
+  '</div></div>';
 }
 
 // Documentação da API renderizada dentro do app (mesmo conteúdo do API.md, resumido).

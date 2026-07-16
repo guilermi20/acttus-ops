@@ -38,7 +38,8 @@ var ICONS = {
  send:'<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
  copy:'<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
  key:'<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>',
- menu:'<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>'
+ menu:'<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>',
+ agenda:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="7" y1="14" x2="12" y2="14"/><line x1="7" y1="18" x2="15" y2="18"/>'
 };
 function ic(n, s) { return '<svg class="i" width="' + (s || 18) + '" height="' + (s || 18) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[n] || ICONS.dot) + '</svg>'; }
 
@@ -102,11 +103,11 @@ function avatar(name, sz) { sz = sz || 26; return '<span class="avt" title="' + 
 var NAV = [
  { sec: 'Painel', admin: true, items: [{ key: 'dashboard', label: 'Visão geral', icon: 'dashboard' }, { key: 'funil', label: 'Funil 50/30/20', icon: 'target' }, { key: 'dashboards', label: 'Dashboards', icon: 'chart' }] },
  { sec: 'Editorial', items: [{ key: 'calendario', label: 'Calendário', icon: 'calendar' }, { key: 'posts', label: 'Posts', icon: 'grid' }, { key: 'gravacoes', label: 'Gravações', icon: 'video' }, { key: 'minhas', label: 'Minhas demandas', icon: 'check' }, { key: 'rotinas', label: 'Rotinas', icon: 'clock' }, { key: 'ideias', label: 'Banco de ideias', icon: 'zap' }] },
- { sec: 'Operação', items: [{ key: 'projetos', label: 'Projetos', icon: 'folder' }, { key: 'reunioes', label: 'Reuniões', icon: 'book' }] },
+ { sec: 'Operação', items: [{ key: 'agenda', label: 'Agenda', icon: 'agenda' }, { key: 'projetos', label: 'Projetos', icon: 'folder' }, { key: 'reunioes', label: 'Reuniões', icon: 'book' }] },
  { sec: 'Cadastros', items: [{ key: 'clientes', label: 'Clientes', icon: 'building' }, { key: 'usuarios', label: 'Usuários', icon: 'users' }] },
  { sec: 'Integrações', admin: true, items: [{ key: 'api', label: 'API & Integrações', icon: 'key' }] }
 ];
-var VIEWS = { dashboard: renderDashboard, funil: renderFunil, dashboards: renderDashboards, calendario: renderCalendario, posts: renderPosts, gravacoes: renderGravacoes, minhas: renderMinhas, rotinas: renderRotinas, ideias: renderIdeias, projetos: renderProjetos, projeto: renderProjeto, reunioes: renderReunioes, reuniao: renderReuniao, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios, api: renderApiKeys };
+var VIEWS = { dashboard: renderDashboard, funil: renderFunil, dashboards: renderDashboards, calendario: renderCalendario, posts: renderPosts, gravacoes: renderGravacoes, minhas: renderMinhas, rotinas: renderRotinas, ideias: renderIdeias, agenda: renderAgenda, projetos: renderProjetos, projeto: renderProjeto, reunioes: renderReunioes, reuniao: renderReuniao, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios, api: renderApiKeys };
 var ADMIN_ROUTES = { dashboard: 1, funil: 1, dashboards: 1, api: 1 };
 var route = 'calendario';
 
@@ -624,6 +625,65 @@ function postCard(p) {
 /* ===================================================================
    CLIENTES
    =================================================================== */
+/* ===================================================================
+   AGENDA (Google Calendar — o backend lê o feed iCal; o front só desenha)
+   =================================================================== */
+var TZ_AG = 'America/Fortaleza';
+var agData = null; // o polling re-renderiza a cada 8s: sem cache, baixaria o feed toda vez
+
+// Evento "flutuante" não tem fuso — a hora que veio É a hora de parede. Não converte.
+function agDate(e) { return new Date(e.floating ? e.start + 'Z' : e.start); }
+function agFmt(e, opt) { return new Intl.DateTimeFormat('pt-BR', Object.assign({ timeZone: TZ_AG }, opt)).format(agDate(e)); }
+function agDayKey(e) {
+ if (e.allDay) return e.start;
+ if (e.floating) return e.start.slice(0, 10);
+ return new Intl.DateTimeFormat('en-CA', { timeZone: TZ_AG, year: 'numeric', month: '2-digit', day: '2-digit' }).format(agDate(e));
+}
+function agTime(e) {
+ if (e.allDay) return 'dia todo';
+ if (e.floating) return e.start.slice(11, 16);
+ return agFmt(e, { hour: '2-digit', minute: '2-digit' });
+}
+function agTodayKey() { return new Intl.DateTimeFormat('en-CA', { timeZone: TZ_AG, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); }
+function agDayLabel(key) {
+ var d = diffDays(agTodayKey(), key);
+ if (d === 0) return 'Hoje';
+ if (d === 1) return 'Amanhã';
+ if (d === -1) return 'Ontem';
+ return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'long' }).format(new Date(key + 'T12:00:00Z'));
+}
+
+function renderAgenda(el) {
+ el.innerHTML = head('Agenda', 'Compromissos de contato@acttusco.com — próximos 60 dias.',
+  '<button class="btn" id="agRel">' + ic('clock', 15) + ' Atualizar</button>') +
+  '<div id="agBody"><div class="panel"><div class="bd"><div class="empty">Carregando agenda…</div></div></div></div>';
+ $('#agRel', el).onclick = function () { agData = null; renderAgenda($('#view')); };
+ if (agData) { paintAgenda(); return; }
+ S.agenda().then(function (d) { agData = d; if (route === 'agenda') paintAgenda(); })
+  .catch(function (e) {
+   var b = $('#agBody'); if (!b) return;
+   b.innerHTML = '<div class="note rej">' + ic('alert', 16) + '<div>Não foi possível carregar a agenda: ' + esc(e.message) + '</div></div>';
+  });
+}
+function paintAgenda() {
+ var b = $('#agBody'); if (!b || !agData) return;
+ var d = agData, warn = '';
+ if (d.masked) warn += '<div class="note rej">' + ic('alert', 16) + '<div><b>A agenda está em modo livre/ocupado.</b> O Google mascara todos os ' + d.total + ' títulos como “Busy”. Troque <code>GCAL_ICS_URL</code> pelo endereço <b>particular</b> no formato iCal (o que tem <code>private-…</code> no lugar de <code>public</code>) e refaça o deploy.</div></div>';
+ if (d.rrule) warn += '<div class="note">' + ic('alert', 16) + '<div>' + d.rrule + ' evento(s) recorrente(s) vieram sem expansão e podem aparecer só na 1ª ocorrência.</div></div>';
+ if (!d.events.length) { b.innerHTML = warn + '<div class="panel"><div class="bd"><div class="empty">Nada agendado nos próximos 60 dias.</div></div></div>'; return; }
+ var byDay = {}, order = [];
+ d.events.forEach(function (e) { var k = agDayKey(e); if (!byDay[k]) { byDay[k] = []; order.push(k); } byDay[k].push(e); });
+ var html = order.map(function (k) {
+  return '<div class="ag-day"><div class="ag-dh">' + esc(agDayLabel(k)) + '<span class="ag-dc">' + byDay[k].length + '</span></div>' +
+   byDay[k].map(function (e) {
+    return '<div class="lrow ag-ev"><span class="ag-t">' + esc(agTime(e)) + '</span>' +
+     '<div class="tx"><div class="t">' + esc(e.title) + '</div>' +
+     (e.location ? '<div class="m">' + esc(e.location) + '</div>' : '') + '</div></div>';
+   }).join('') + '</div>';
+ }).join('');
+ b.innerHTML = warn + '<div class="panel"><div class="bd">' + html + '</div></div>';
+}
+
 function clientAvatar(c, sz) {
  sz = sz || 30;
  if (c.avatar_url) return '<span class="cliav" style="width:' + sz + 'px;height:' + sz + 'px;background-image:url(' + JSON.stringify(c.avatar_url) + ')"></span>';

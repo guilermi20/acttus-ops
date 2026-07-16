@@ -122,6 +122,8 @@
   function updateProjectTask(id, b) { return req('PATCH', '/api/projects?entity=task&id=' + encodeURIComponent(id), b).then(function (x) { upsert(state.projectTasks, x); emit(); return x; }); }
   function deleteProjectTask(id) { return req('DELETE', '/api/projects?entity=task&id=' + encodeURIComponent(id)).then(function () { state.projectTasks = state.projectTasks.filter(function (x) { return x.id !== id; }); emit(); }); }
   function allRoutines() { return req('GET', '/api/routines?scope=all'); }
+  // Agenda do Google: mora em meetings (limite de 12 funções serverless no Hobby).
+  function agenda(days) { return req('GET', '/api/meetings?entity=gcal' + (days ? '&days=' + days : '')); }
   function createMeeting(b) { return req('POST', '/api/meetings', b).then(function (m) { state.meetings.unshift(m); emit(); return m; }); }
   function updateMeeting(id, b) { return req('PATCH', '/api/meetings?id=' + encodeURIComponent(id), b).then(function (m) { var i = -1; for (var k = 0; k < state.meetings.length; k++) if (state.meetings[k].id === id) { i = k; break; } if (i >= 0) state.meetings[i] = m; else state.meetings.unshift(m); emit(); return m; }); }
   function deleteMeeting(id) { return req('DELETE', '/api/meetings?id=' + encodeURIComponent(id)).then(function () { state.meetings = state.meetings.filter(function (m) { return m.id !== id; }); emit(); }); }
@@ -150,7 +152,7 @@
     createRoutine: createRoutine, updateRoutine: updateRoutine, deleteRoutine: deleteRoutine,
     createProject: createProject, updateProject: updateProject, deleteProject: deleteProject,
     createProjectTask: createProjectTask, updateProjectTask: updateProjectTask, deleteProjectTask: deleteProjectTask,
-    allRoutines: allRoutines,
+    allRoutines: allRoutines, agenda: agenda,
     loadApiKeys: loadApiKeys, createApiKey: createApiKey, revokeApiKey: revokeApiKey,
     startPolling: startPolling, stopPolling: stopPolling,
     isAuthed: function () { return !!state.token; }

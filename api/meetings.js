@@ -1,5 +1,6 @@
 import { sql, requireAuth } from '../lib/db.js';
 import { del } from '@vercel/blob';
+import { agenda } from '../lib/gcal.js';
 
 function cleanParts(p) {
   if (!Array.isArray(p)) return [];
@@ -15,6 +16,17 @@ const RET = `id, title, to_char(meeting_date,'YYYY-MM-DD') as meeting_date, cate
 export default async function handler(req, res) {
   if (!requireAuth(req, res)) return;
   try {
+    // Agenda do Google mora aqui (e não em api/agenda.js) porque o plano Hobby
+    // limita o projeto a 12 funções serverless — e já estamos nas 12.
+    if (req.method === 'GET' && req.query && req.query.entity === 'gcal') {
+      const days = Math.min(180, Math.max(1, parseInt(req.query.days, 10) || 60));
+      try {
+        return res.status(200).json(await agenda(days));
+      } catch (e) {
+        return res.status(502).json({ error: String(e.message || e) });
+      }
+    }
+
     if (req.method === 'GET') {
       const { rows } = await sql('select ' + RET + ' from meetings order by meeting_date desc nulls last, created_at desc');
       return res.status(200).json(rows);

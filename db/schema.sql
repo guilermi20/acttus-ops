@@ -5,6 +5,7 @@ create table if not exists clients (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
   is_internal boolean not null default false,
+  stage text not null default 'ongoing',
   share_token text,
   cover_url text,
   avatar_url text,
@@ -13,6 +14,10 @@ create table if not exists clients (
   created_at timestamptz not null default now()
 );
 create unique index if not exists clients_share_token_idx on clients(share_token);
+-- Etapa do ciclo de vida: onboarding | ongoing | offboarding | churn.
+-- ALTER à parte porque o "create table if not exists" acima não altera banco já existente.
+-- Sem check constraint (mesmo padrão de ideas.status): quem valida é a API, único escritor.
+alter table clients add column if not exists stage text not null default 'ongoing';
 
 -- Banco de ideias (sugestões de clientes pelo painel + ideias internas)
 create table if not exists ideas (

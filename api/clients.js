@@ -1,35 +1,25 @@
 import { sql, requireAuth } from '../lib/db.js';
-import { sendGroup } from '../lib/whatsapp.js';
 import crypto from 'node:crypto';
 
-const COLS = 'id, name, is_internal, share_token, cover_url, avatar_url, planned_months, metrics';
+const COLS = 'id, name, is_internal, stage, share_token, cover_url, avatar_url, planned_months, metrics';
 
-function monthLabel(ym) {
-  const M = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-  const p = String(ym).split('-');
-  return (M[+p[1] - 1] || p[1]) + ' ' + p[0];
-}
+// Etapas do ciclo de vida do cliente. A API é o único escritor da coluna,
+// então a validação do enum mora aqui (a coluna é text puro no banco).
+const STAGES = ['onboarding', 'ongoing', 'offboarding', 'churn'];
+function validStage(v) { return STAGES.indexOf(String(v)) >= 0 ? String(v) : null; }
 
-// Marca/desmarca um mês (YYYY-MM) como planejado. Ao MARCAR, avisa o grupo.
-async function togglePlan(req, res, uid) {
+// Marca/desmarca um mês (YYYY-MM) como planejado. Não notifica ninguém: é um
+// controle interno do calendário, não um evento que a equipe precisa saber.
+async function togglePlan(req, res) {
   const id = (req.query && req.query.id) || (req.body && req.body.id);
   const ym = req.body && req.body.ym;
   if (!id || !ym) return res.status(400).json({ error: 'id e ym são obrigatórios' });
   const cur = await sql('select name, planned_months from clients where id = $1', [id]);
   if (!cur.rows.length) return res.status(404).json({ error: 'Cliente não encontrado' });
-  const client = cur.rows[0];
-  let arr = client.planned_months;
+  let arr = cur.rows[0].planned_months;
   if (!Array.isArray(arr)) arr = [];
-  const nowPlanned = arr.indexOf(ym) < 0; // não estava marcado → vai marcar
-  arr = nowPlanned ? arr.concat([ym]) : arr.filter((x) => x !== ym);
+  arr = arr.indexOf(ym) < 0 ? arr.concat([ym]) : arr.filter((x) => x !== ym);
   await sql('update clients set planned_months = $1::jsonb where id = $2', [JSON.stringify(arr), id]);
-  if (nowPlanned) {
-    let who = '';
-    try { const u = await sql('select name from users where id = $1', [uid]); who = u.rows[0] ? u.rows[0].name : ''; } catch (e) {}
-    const msg = '📅 *Calendário planejado* — ' + client.name + '\nMês: ' + monthLabel(ym) + (who ? '\nMarcado por: ' + who : '');
-    try { await sendGroup(msg); } catch (e) {}
-    try { await sql('insert into notifications (text, kind) values ($1, $2)', ['Calendário de ' + monthLabel(ym) + ' (' + client.name + ') marcado como planejado', 'plan']); } catch (e) {}
-  }
   const { rows } = await sql('select ' + COLS + ' from clients where id = $1', [id]);
   return res.status(200).json(rows[0]);
 }
@@ -38,19 +28,21 @@ export default async function handler(req, res) {
   const uid = requireAuth(req, res);
   if (!uid) return;
   try {
-    if (req.query && req.query.entity === 'plan') return await togglePlan(req, res, uid);
+    if (req.query && req.query.entity === 'plan') return await togglePlan(req, res);
     if (req.method === 'GET') {
       const { rows } = await sql('select ' + COLS + ' from clients order by is_internal desc, name');
       return res.status(200).json(rows);
     }
 
     if (req.method === 'POST') {
-      const { name, is_internal, cover_url, avatar_url } = req.body || {};
+      const { name, is_internal, cover_url, avatar_url, stage } = req.body || {};
       if (!name || !String(name).trim()) return res.status(400).json({ error: 'Nome do cliente é obrigatório' });
+      const stg = stage == null ? 'ongoing' : validStage(stage);
+      if (!stg) return res.status(400).json({ error: 'Etapa inválida' });
       const token = crypto.randomBytes(16).toString('hex');
       const ins = await sql`
-        insert into clients (name, is_internal, share_token, cover_url, avatar_url)
-        values (${String(name).trim()}, ${!!is_internal}, ${token}, ${cover_url || null}, ${avatar_url || null})
+        insert into clients (name, is_internal, stage, share_token, cover_url, avatar_url)
+        values (${String(name).trim()}, ${!!is_internal}, ${stg}, ${token}, ${cover_url || null}, ${avatar_url || null})
         returning id`;
       const { rows } = await sql('select ' + COLS + ' from clients where id = $1', [ins.rows[0].id]);
       return res.status(201).json(rows[0]);
@@ -63,6 +55,7 @@ export default async function handler(req, res) {
       const f = {};
       if ('name' in b) f.name = String(b.name || '').trim();
       if ('is_internal' in b) f.is_internal = !!b.is_internal;
+      if ('stage' in b) { const s = validStage(b.stage); if (!s) return res.status(400).json({ error: 'Etapa inválida' }); f.stage = s; }
       if ('cover_url' in b) f.cover_url = b.cover_url || null;
       if ('avatar_url' in b) f.avatar_url = b.avatar_url || null;
       if ('metrics' in b) f.metrics = (b.metrics && typeof b.metrics === 'object') ? b.metrics : {};

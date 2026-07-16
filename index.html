@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/styles.css?v=5">
+<link rel="stylesheet" href="/styles.css?v=6">
 <script>
 function acttusShowErr(msg){
   if(/ResizeObserver loop/i.test(String(msg)))return; // aviso benigno do navegador — ignora
@@ -41,20 +41,30 @@ window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;acttu
 
 <!-- APP -->
 <div class="app" id="app" hidden>
+ <div class="scrim" id="scrim"></div>
  <aside class="rail">
   <div class="brand"><span class="av brand-logo"><img src="/logo.png" alt="Acttus" onerror="var s=this.parentNode;s.classList.remove('brand-logo');s.textContent='A'"></span><div><div class="nm">Acttus</div><div class="sub">Calendário editorial</div></div></div>
   <div class="railact"><button class="btn pri sm" id="btnCriar"></button><button class="bell" id="btnBell"><span id="bellIc"></span><span class="bdot" id="bellDot" hidden>0</span></button></div>
   <nav class="nav sb-scroll" id="nav"></nav>
   <div class="railfoot"><div class="theme-row"><span id="themeIc"></span> Modo escuro <button class="switch on" id="themeSwitch" type="button" role="switch" aria-label="Alternar tema claro/escuro"></button></div><div class="merow" id="meRow"></div><div class="out" id="logout"><span id="outIc"></span> Sair</div></div>
  </aside>
- <div class="main"><div class="scroll"><div class="wrap" id="view"></div></div></div>
+ <div class="main">
+  <!-- topbar: só aparece no celular, quando a rail vira gaveta -->
+  <header class="topbar">
+   <button class="tb-btn" id="btnMenu" type="button" aria-label="Abrir menu" aria-controls="app" aria-expanded="false"></button>
+   <span class="tb-nm">Acttus OS</span>
+   <button class="tb-btn" id="btnCriarM" type="button" aria-label="Novo post"></button>
+   <button class="tb-btn" id="btnBellM" type="button" aria-label="Notificações"><span id="bellIcM"></span><span class="bdot" id="bellDotM" hidden>0</span></button>
+  </header>
+  <div class="scroll"><div class="wrap" id="view"></div></div>
+ </div>
 </div>
 
 <div class="toast" id="toast"></div>
 <div class="modal" id="modal"><div class="mbg" id="modalBg"></div><div class="mbox" id="mboxc"></div></div>
 <div class="pop" id="notifpop" hidden></div>
 
-<script src="/data.js?v=5"></script>
-<script src="/app.js?v=5"></script>
+<script src="/data.js?v=6"></script>
+<script src="/app.js?v=6"></script>
 </body>
 </html>

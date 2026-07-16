@@ -60,8 +60,10 @@ export default async function handler(req, res) {
       // sugerir ideia (default)
       const title = String(b.title || '').trim();
       if (!title) return res.status(400).json({ error: 'Descreva a ideia' });
+      const notes = String(b.notes || '').slice(0, 2000);
       await sql`insert into ideas (client_id, title, notes, status, source)
-        values (${client.id}, ${title.slice(0, 300)}, ${String(b.notes || '').slice(0, 2000)}, 'nova', 'painel')`;
+        values (${client.id}, ${title.slice(0, 300)}, ${notes}, 'nova', 'painel')`;
+      try { await sendGroup('💡 *Nova ideia* — ' + client.name + '\n*' + title + '*' + (notes ? '\n\n' + notes : '')); } catch (e) {}
       await sql('insert into notifications (text, kind) values ($1, $2)', ['Nova ideia sugerida por ' + client.name, 'idea']);
       return res.status(201).json({ ok: true });
     }

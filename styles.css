@@ -475,6 +475,17 @@ img.pp-media.zoomable{cursor:zoom-in}
 .filterbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}
 .filterbar .searchbar{margin-top:0;flex:1;min-width:220px}
 
+/* chips de filtro (etapas do cliente) */
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;border-radius:20px;padding:7px 13px;border:1px solid var(--line2);background:var(--panel2);color:var(--ink2);transition:.12s}
+.chip:hover{border-color:var(--mut2);color:var(--ink)}
+.chip b{font-weight:800;color:var(--mut2)}
+.chip.on{border-color:currentColor}
+.chip.on b{color:inherit}
+.chip.on.c-gray{background:var(--gray-soft)} .chip.on.c-blue{background:var(--blue-soft)}
+.chip.on.c-green{background:var(--green-soft)} .chip.on.c-amber{background:var(--amber-soft)}
+.chip.on.c-red{background:var(--red-soft)}
+
 /* drag no calendário + nota de reprovação */
 .cal-ev{cursor:grab}
 .cal-ev.dragging{opacity:.45}
@@ -504,6 +515,85 @@ img.pp-media.zoomable{cursor:zoom-in}
 .apidoc .ex{margin:10px 0}
 .apidoc .exh{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;font-weight:600;color:var(--ink2);margin-bottom:5px}
 .code{background:var(--sb);border:1px solid var(--line2);border-radius:10px;padding:12px 14px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:var(--ink2);white-space:pre;line-height:1.6;margin:0}
+
+/* ===================================================================
+   MOBILE
+   A rail de 262px não cabe em celular: abaixo de 900px ela vira gaveta
+   (fora do fluxo, deslizando por cima) e a topbar assume as ações dela
+   — menu, novo post e sino. O resto é respiro: alvos de toque maiores,
+   tabelas que rolam em vez de espremer, e modal como folha inferior.
+   =================================================================== */
+.topbar{display:none}
+.scrim{display:none}
+
+@media(max-width:900px){
+ .app{grid-template-columns:1fr;height:100vh;height:100dvh}
+ .rail{position:fixed;top:0;bottom:0;left:0;width:min(86vw,290px);z-index:400;transform:translateX(-100%);transition:transform .22s ease;box-shadow:var(--sh-lg)}
+ .app.navopen .rail{transform:none}
+ .scrim{display:block;position:fixed;inset:0;z-index:390;background:rgba(8,6,4,.6);opacity:0;pointer-events:none;transition:opacity .22s}
+ .app.navopen .scrim{opacity:1;pointer-events:auto}
+ .topbar{display:flex;align-items:center;gap:8px;flex:0 0 auto;padding:9px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+ .tb-nm{flex:1;min-width:0;font-weight:800;font-size:15px;letter-spacing:-.2px}
+ .tb-btn{position:relative;display:flex;align-items:center;justify-content:center;width:40px;height:40px;flex:0 0 auto;border:1px solid var(--line2);background:var(--panel2);color:var(--ink2);border-radius:10px}
+ .tb-btn:active{background:var(--panel3)}
+ .topbar .bdot{border-color:var(--panel)}
+ .wrap{padding:16px 14px 80px}
+ .phead h1{font-size:22px}
+ .phead .sub{font-size:13px}
+ .kpi{padding:15px}
+ .kpi .kv{font-size:28px}
+ /* o sino fica na topbar (topo) → o pop vira folha inferior, no alcance do polegar */
+ .pop{left:8px;right:8px;bottom:8px;width:auto;max-height:70dvh}
+ /* tabela rola dentro do painel em vez de espremer as colunas */
+ .bd:has(>.tbl),.mbd:has(>.tbl){overflow-x:auto}
+ .bd:has(>.tbl) .tbl,.mbd:has(>.tbl) .tbl{min-width:max-content}
+ /* kanban: swipe coluna a coluna */
+ .board{scroll-snap-type:x proximity}
+ .kcol{scroll-snap-align:start}
+ .hbl{width:110px}
+ .searchbar,.filterbar .searchbar{max-width:none}
+}
+
+@media(max-width:600px){
+ /* iOS dá zoom em input com fonte < 16px */
+ .fld input,.fld select,.fld textarea,.searchbar input{font-size:16px}
+ .login-box{padding:24px 20px}
+ /* modal vira folha inferior, com o rodapé de ações sempre alcançável */
+ .modal{padding:0;align-items:flex-end}
+ .mbox{max-width:none;max-height:94dvh;border-radius:18px 18px 0 0}
+ .mft{position:sticky;bottom:0;background:var(--panel);z-index:2}
+ .mft .btn{padding:11px 14px}
+ /* alvos de toque */
+ .iconbtn{padding:9px}
+ .btn.sm{padding:9px 12px}
+}
+
+@media(max-width:480px){
+ .cal-grid{gap:3px}
+ .cal-cell{min-height:62px;padding:3px 3px 4px;border-radius:7px}
+ .cal-d{font-size:11px}
+ .cal-ev{font-size:9.5px;padding:1px 3px;border-left-width:2px}
+ .cal-wd{font-size:9.5px;padding:2px 0}
+ .phead h1{font-size:20px}
+}
+
+/* Painel do cliente (aberto quase sempre pelo link no WhatsApp, no celular) */
+@media(max-width:760px){
+ .pub-cover{height:130px}
+ .pub-wrap{padding:0 14px 60px}
+ .pub-head{margin-top:-32px;gap:12px}
+ .pub-av{width:64px;height:64px;border-radius:16px;font-size:26px;border-width:2px}
+ .pub-h-tx{min-width:0}
+ .pub-h-tx h1{font-size:21px}
+ .pub-head .btn{width:100%;justify-content:center;margin-bottom:0}
+ .pub-suggest{padding:14px;gap:10px}
+ .pub-suggest .btn{width:100%;justify-content:center}
+ .pub-section{margin-top:22px}
+ .pp-medias{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}
+ .pp-media{max-height:180px}
+ .lightbox{padding:10px}
+ .lightbox .lb-x{top:10px;right:12px}
+}
 
 /* ===== Tutorial de conexão do MCP ===== */
 .apidoc code.mute{color:var(--mut2);background:transparent;border-color:transparent}

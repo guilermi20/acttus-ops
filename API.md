@@ -96,7 +96,7 @@ Todos seguem o mesmo padrão REST:
 
 **Filtros por recurso** (querystring):
 - `posts`: `client_id`, `responsible_id`, `status`, `funnel_stage`, `post_type`, `channel`, `kind`, `from` (pub_date ≥), `to` (pub_date ≤)
-- `clients`: `is_internal`
+- `clients`: `is_internal`, `stage` (`onboarding` | `ongoing` | `offboarding` | `churn`)
 - `ideas`: `client_id`, `status`, `source`
 - `projects`: `status`, `responsible_id`
 - `project-tasks`: `project_id`, `responsible_id`, `status`

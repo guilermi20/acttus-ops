@@ -8,14 +8,16 @@ notificações de tarefas vencidas no WhatsApp (Evolution API).
 - **Backend:** funções serverless da Vercel em `api/` (Node.js)
 - **Banco:** Postgres (Neon, via integração nativa da Vercel)
 - **Tempo real:** polling a cada 8s (re-renderiza quando há mudança)
-- **WhatsApp:** Evolution API, disparado por Vercel Cron (1x/dia) para tarefas vencidas
+- **WhatsApp:** Evolution API. Eventos (status, aprovação do cliente, ideia) vão pro grupo;
+  os resumos por cron vão no privado de cada responsável — de manhã (o que é dele) e às 18h
+  (o que ele publica amanhã). Demanda sem responsável cai no grupo, para não sumir.
 
 ## Estrutura
 
 ```
 index.html  styles.css  app.js  data.js     # frontend estático
 api/                                          # funções serverless
-  login.js  users.js  clients.js  posts.js  notifications.js  cron/overdue.js
+  login.js  users.js  clients.js  posts.js  notifications.js  cron.js
 lib/        db.js  whatsapp.js                # módulos compartilhados (não são rotas)
 db/         schema.sql  seed.sql             # banco
 scripts/    db-setup.js                       # aplica schema+seed
@@ -91,7 +93,11 @@ curl -H "X-Api-Key: act_live_xxx" https://SEU-DOMINIO.vercel.app/api/v1/ping
 
 ## Testar o WhatsApp manualmente
 ```bash
-curl "https://SEU-DOMINIO.vercel.app/api/cron/overdue?secret=SEU_CRON_SECRET"
+# resumo da manhã (DM por responsável) + lembretes do mês + faxina de storage
+curl "https://SEU-DOMINIO.vercel.app/api/cron?job=morning&secret=SEU_CRON_SECRET"
+curl "https://SEU-DOMINIO.vercel.app/api/cron?job=dms&secret=SEU_CRON_SECRET"     # só os DMs
+curl "https://SEU-DOMINIO.vercel.app/api/cron?job=digest&secret=SEU_CRON_SECRET"  # o que publica amanhã
+curl "https://SEU-DOMINIO.vercel.app/api/cron?job=gc&secret=SEU_CRON_SECRET"      # só a faxina de storage
 ```
 
 ## Rodar localmente

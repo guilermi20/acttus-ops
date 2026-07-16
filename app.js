@@ -37,7 +37,8 @@ var ICONS = {
  eye:'<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
  send:'<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
  copy:'<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
- key:'<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>'
+ key:'<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>',
+ menu:'<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>'
 };
 function ic(n, s) { return '<svg class="i" width="' + (s || 18) + '" height="' + (s || 18) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[n] || ICONS.dot) + '</svg>'; }
 
@@ -64,6 +65,15 @@ var FUNNEL = [
  { key: 'fundo', label: 'Fundo de funil', short: 'Fundo', target: 20, color: 'green' }
 ];
 function funnelMeta(k) { for (var i = 0; i < FUNNEL.length; i++) if (FUNNEL[i].key === k) return FUNNEL[i]; return FUNNEL[0]; }
+// Etapas do ciclo de vida do cliente (coluna clients.stage).
+var STAGES = [
+ { key: 'onboarding', label: 'Onboarding', color: 'blue', icon: 'zap' },
+ { key: 'ongoing', label: 'Ongoing', color: 'green', icon: 'check' },
+ { key: 'offboarding', label: 'Off-boarding', color: 'amber', icon: 'clock' },
+ { key: 'churn', label: 'Churn', color: 'red', icon: 'alert' }
+];
+function stageMeta(k) { for (var i = 0; i < STAGES.length; i++) if (STAGES[i].key === k) return STAGES[i]; return STAGES[1]; }
+function stageBadge(c) { var m = stageMeta(c.stage); return '<span class="bg c-' + m.color + '">' + ic(m.icon, 12) + m.label + '</span>'; }
 var TYPES = [{ key: 'carrossel', label: 'Carrossel' }, { key: 'reels', label: 'Reels' }, { key: 'estatico', label: 'Estático' }];
 function typeLabel(k) { for (var i = 0; i < TYPES.length; i++) if (TYPES[i].key === k) return TYPES[i].label; return k; }
 var CHANNELS = [{ key: 'organico', label: 'Orgânico' }, { key: 'trafego', label: 'Tráfego' }];
@@ -101,7 +111,13 @@ var ADMIN_ROUTES = { dashboard: 1, funil: 1, dashboards: 1, api: 1 };
 var route = 'calendario';
 
 function isAdmin() { return !!(st.user && st.user.role === 'admin'); }
-function go(v) { if (ADMIN_ROUTES[v] && !isAdmin()) v = 'calendario'; route = v; renderNav(); renderView(); }
+// No celular a rail é uma gaveta por cima do conteúdo — navegar tem que fechá-la.
+function setNav(open) {
+ var a = $('#app'); if (!a) return;
+ a.classList.toggle('navopen', !!open);
+ var b = $('#btnMenu'); if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+function go(v) { if (ADMIN_ROUTES[v] && !isAdmin()) v = 'calendario'; route = v; setNav(false); renderNav(); renderView(); }
 function renderNav() {
  var h = '';
  NAV.forEach(function (g) {
@@ -394,7 +410,7 @@ function renderCliente(el) {
     '</tbody></table>' + (mx.notes ? '<div class="ata" style="margin-top:12px">' + esc(mx.notes) + '</div>' : '')
    : '<div class="empty">Sem dados ainda. Em “Editar dados”, registre seguidores/visualizações de quando começamos × hoje.</div>') +
   '</div></div>';
- el.innerHTML = head(cl.name, (cl.is_internal ? 'Interno (Acttus) · ' : '') + t + ' post' + (t === 1 ? '' : 's') + (t ? ' · ' + mix : ''),
+ el.innerHTML = head(cl.name, stageMeta(cl.stage).label + ' · ' + (cl.is_internal ? 'Interno (Acttus) · ' : '') + t + ' post' + (t === 1 ? '' : 's') + (t ? ' · ' + mix : ''),
   '<button class="btn" data-back="1">' + ic('left') + ' Voltar</button>' +
   '<button class="btn" data-clilink="' + esc(cl.share_token || '') + '">' + ic('link', 15) + ' Link do painel</button>' +
   '<button class="btn" data-cliedit2="1">' + ic('edit', 15) + ' Editar</button>' +
@@ -619,20 +635,28 @@ function copyPanelLink(token) {
  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(function () { toast('Link do painel copiado', url); }).catch(function () { prompt('Link do painel do cliente:', url); });
  else prompt('Link do painel do cliente:', url);
 }
+var cliStage = ''; // filtro de etapa ativo ('' = todas)
 function renderClientes(el) {
- var rows = st.clients.map(function (c) {
+ var list = st.clients.filter(function (c) { return !cliStage || (c.stage || 'ongoing') === cliStage; });
+ var rows = list.map(function (c) {
   var n = st.posts.filter(function (p) { return p.client_id === c.id; }).length;
-  return '<div class="lrow click" data-cli="' + c.id + '">' + clientAvatar(c, 32) +
+  return '<div class="lrow click' + (c.stage === 'churn' ? ' off' : '') + '" data-cli="' + c.id + '">' + clientAvatar(c, 32) +
    '<div class="tx"><div class="t">' + esc(c.name) + '</div><div class="m">' + (c.is_internal ? 'Interno (Acttus)' : 'Cliente') + ' · ' + n + ' posts</div></div>' +
-   '<div class="rt rowacts">' +
+   '<div class="rt rowacts">' + stageBadge(c) +
     '<button class="iconbtn" data-clilink="' + esc(c.share_token || '') + '" title="Copiar link do painel do cliente">' + ic('link', 16) + '</button>' +
     '<button class="iconbtn" data-cliedit="' + c.id + '" title="Editar cliente">' + ic('edit', 16) + '</button>' +
     '<span class="open-link">abrir ' + ic('right', 13) + '</span></div></div>';
- }).join('') || '<div class="empty">Nenhum cliente ainda.</div>';
+ }).join('') || '<div class="empty">' + (cliStage ? 'Nenhum cliente nesta etapa.' : 'Nenhum cliente ainda.') + '</div>';
+ var chips = [{ key: '', label: 'Todas', color: 'gray' }].concat(STAGES).map(function (s) {
+  var n = s.key ? st.clients.filter(function (c) { return (c.stage || 'ongoing') === s.key; }).length : st.clients.length;
+  return '<button class="chip' + (cliStage === s.key ? ' on c-' + s.color : '') + '" data-stg="' + s.key + '">' + esc(s.label) + ' <b>' + n + '</b></button>';
+ }).join('');
  el.innerHTML = head('Clientes', 'Clique no cliente para o kanban e o calendário dele. Use o 🔗 para compartilhar o painel (só visualização).',
   '<button class="btn pri" id="newCli">' + ic('plus') + ' Novo cliente</button>') +
+  '<div class="chips">' + chips + '</div>' +
   '<div class="panel"><div class="bd">' + rows + '</div></div>';
  $('#newCli', el).onclick = function () { openClientModal(null); };
+ $$('[data-stg]', el).forEach(function (b) { b.onclick = function () { cliStage = b.getAttribute('data-stg'); renderClientes(el); }; });
  $$('[data-cli]', el).forEach(function (r) { r.onclick = function () { openCliente(r.getAttribute('data-cli')); }; });
  $$('[data-cliedit]', el).forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); var c = clientById(b.getAttribute('data-cliedit')); if (c) openClientModal(c); }; });
  $$('[data-clilink]', el).forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); copyPanelLink(b.getAttribute('data-clilink')); }; });
@@ -666,12 +690,15 @@ function openClientModal(cli) {
  var avatarUrl = c.avatar_url || '', coverUrl = c.cover_url || '';
  openModal(editing ? 'Editar cliente' : 'Novo cliente', ic('building'),
   '<label class="fld"><span>Nome do cliente</span><input id="cNome" value="' + esc(c.name || '') + '" placeholder="Ex.: Escritório Silva"></label>' +
+  '<label class="fld"><span>Etapa</span><select id="cStage">' + STAGES.map(function (s) {
+   return '<option value="' + s.key + '"' + ((c.stage || 'ongoing') === s.key ? ' selected' : '') + '>' + esc(s.label) + '</option>';
+  }).join('') + '</select></label>' +
   '<label class="chk"><input type="checkbox" id="cInt"' + (c.is_internal ? ' checked' : '') + '> É interno (Acttus) — aparece em amarelo</label>' +
   '<div class="fld"><span>Foto de perfil</span><div class="imgup" id="avUp"></div></div>' +
   '<div class="fld"><span>Capa</span><div class="imgup" id="cvUp"></div></div>',
   function () {
    var name = $('#cNome').value.trim(); if (!name) { toast('Informe o nome', 'err'); return false; }
-   var payload = { name: name, is_internal: $('#cInt').checked, avatar_url: avatarUrl || null, cover_url: coverUrl || null };
+   var payload = { name: name, stage: $('#cStage').value, is_internal: $('#cInt').checked, avatar_url: avatarUrl || null, cover_url: coverUrl || null };
    var op = editing ? S.updateClient(cli.id, payload) : S.createClient(payload);
    op.then(function () { toast(editing ? 'Cliente salvo' : 'Cliente criado'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
    return false;
@@ -868,7 +895,7 @@ function mcpTutorialHtml() {
 function apiDocHtml(base) {
  var res = [
   ['posts', 'Publicações do calendário', 'client_id, status, funnel_stage, post_type, channel, kind, responsible_id, from, to', '✅'],
-  ['clients', 'Clientes', 'is_internal', '✅'],
+  ['clients', 'Clientes', 'is_internal, stage', '✅'],
   ['ideas', 'Banco de ideias', 'client_id, status, source', '✅'],
   ['projects', 'Projetos internos', 'status, responsible_id', '✅'],
   ['project-tasks', 'Tarefas de projeto', 'project_id, responsible_id, status', '✅'],
@@ -1276,15 +1303,18 @@ function openModal(title, icon, bodyHTML, onSubmit, okLabel, extraLeft) {
 }
 function closeModal() { $('#modal').classList.remove('show'); $('#mboxc').innerHTML = ''; _modalSubmit = null; }
 $('#modalBg').onclick = closeModal;
-document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeModal(); $('#notifpop').hidden = true; } });
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeModal(); $('#notifpop').hidden = true; setNav(false); } });
 
 /* ===================================================================
    NOTIFICAÇÕES (sino)
    =================================================================== */
 function renderBell() {
  var unread = st.notifications.filter(function (n) { return !n.read_at; }).length;
- var dot = $('#bellDot'); dot.hidden = !unread; dot.textContent = unread;
- $('#bellIc').innerHTML = ic('bell', 18);
+ // o sino existe duas vezes: na rail (desktop) e na topbar (celular)
+ ['', 'M'].forEach(function (sfx) {
+  var dot = $('#bellDot' + sfx); if (dot) { dot.hidden = !unread; dot.textContent = unread; }
+  var icn = $('#bellIc' + sfx); if (icn) icn.innerHTML = ic('bell', 18);
+ });
 }
 function toggleNotifs() {
  var p = $('#notifpop');
@@ -1320,6 +1350,13 @@ function showApp() {
  $('#btnCriar').onclick = function () { openPostModal(null); };
  $('#btnBell').onclick = toggleNotifs;
  $('#logout').onclick = function () { S.logout(); location.reload(); };
+ // topbar do celular: espelha as ações da rail (que está fechada na gaveta)
+ $('#btnMenu').innerHTML = ic('menu', 20);
+ $('#btnCriarM').innerHTML = ic('plus', 20);
+ $('#btnMenu').onclick = function () { setNav(!$('#app').classList.contains('navopen')); };
+ $('#scrim').onclick = function () { setNav(false); };
+ $('#btnCriarM').onclick = function () { openPostModal(null); };
+ $('#btnBellM').onclick = toggleNotifs;
  var sw = $('#themeSwitch'); if (sw) sw.onclick = function () { setTheme(document.body.classList.contains('light') ? 'dark' : 'light'); };
  applyTheme(currentTheme());
  renderMe(); renderNav(); renderView(); renderBell();

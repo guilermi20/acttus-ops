@@ -4,72 +4,98 @@ import { list, del } from '@vercel/blob';
 
 const OPEN = ['Agendado', 'Em produção', 'Aguardando aprovação', 'Modificação'];
 const ICON = { 'Agendado': '🗓️', 'Em produção': '🛠️', 'Aguardando aprovação': '👀', 'Modificação': '✏️', 'Finalizado': '✅', 'Postado': '📣' };
+
 function monthLabel(ym) {
   const M = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
   const p = String(ym).split('-'); return (M[+p[1] - 1] || p[1]) + ' ' + p[0];
 }
 
-// Demandas a concluir (atrasadas/hoje) → grupo, agrupadas por RESPONSÁVEL, com ícone de status,
-// ordenadas da mais próxima de vencer para a menos próxima.
-async function overdue() {
-  const p = await sql(`select p.title, to_char(p.due_date,'DD/MM') as due, p.status,
-      c.name as client, u.name as resp
-    from posts p left join clients c on c.id = p.client_id left join users u on u.id = p.responsible_id
+const POSTS = `select p.title, p.status, p.pub_time,
+    to_char(p.due_date,'DD/MM') as due, to_char(p.pub_date,'DD/MM') as pub,
+    c.name as client, u.id as uid, u.name as resp, u.phone
+  from posts p
+  left join clients c on c.id = p.client_id
+  left join users u on u.id = p.responsible_id`;
+
+const label = (r) => (ICON[r.status] || '•') + ' *' + r.title + '* — ' + (r.client || 'sem cliente');
+const section = (title, rows, fmt) => (rows.length ? '*' + title + ' (' + rows.length + ')*\n' + rows.map(fmt).join('\n') : null);
+
+// Distribui as linhas por responsável. Quem não tem responsável — ou tem, mas sem
+// telefone cadastrado — não pode receber DM: cai no balde de órfãos, que vai pro
+// grupo. Assim nenhuma demanda some por falta de destinatário.
+function router() {
+  const people = new Map(); // uid → { name, phone, ...listas }
+  const orphans = [];
+  return {
+    people, orphans,
+    put(row, key) {
+      if (!row.uid || !row.phone) { orphans.push({ row, key }); return; }
+      let p = people.get(row.uid);
+      if (!p) { p = { name: row.resp, phone: row.phone, overdue: [], soon: [], finalized: [], routines: [], tomorrow: [] }; people.set(row.uid, p); }
+      p[key].push(row);
+    },
+  };
+}
+
+// Manda o balde de órfãos pro grupo, com o motivo de não ter virado DM.
+async function flushOrphans(orphans, head, tail) {
+  if (!orphans.length) return 0;
+  const lines = orphans.map((o) => label(o.row) + (tail ? tail(o) : '') +
+    (o.row.resp ? ' · ⚠️ ' + o.row.resp + ' está sem telefone' : ' · ⚠️ sem responsável'));
+  await sendGroup(head + '\n' + lines.join('\n'));
+  return orphans.length;
+}
+
+// Resumo da manhã: UM DM por pessoa com tudo que é dela (rotinas vencidas,
+// demandas atrasadas, o que vence em 2 dias e o que está pronto pra publicar).
+async function morningDMs() {
+  const overdue = (await sql(POSTS + `
     where p.due_date is not null and p.due_date <= current_date and p.status = any($1)
-    order by u.name nulls last, p.due_date asc limit 150`, [OPEN]);
-  if (!p.rows.length) return { posts: 0 };
-  const byResp = {};
-  for (const r of p.rows) { const k = r.resp || 'Sem responsável'; (byResp[k] = byResp[k] || []).push(r); }
-  const blocks = ['⏰ *Demandas a concluir (' + p.rows.length + ')*'];
-  for (const resp of Object.keys(byResp)) {
-    const lines = byResp[resp].map((r) => (ICON[r.status] || '•') + ' *' + r.title + '* — ' + (r.client || 'sem cliente') + ' — vence ' + r.due);
-    blocks.push('👤 *' + resp + '*\n' + lines.join('\n'));
-  }
-  await sendGroup(blocks.join('\n\n'));
-  await sql('insert into notifications (text, kind, whatsapp_sent) values ($1,$2,$3)', [p.rows.length + ' demanda(s) a concluir', 'due', true]);
-  return { posts: p.rows.length };
-}
-
-// Rotinas vencidas → DM no privado do dono.
-async function routineDMs() {
-  const r = await sql(`select r.title, to_char(r.due_date,'DD/MM') as due, u.name as owner, u.phone
+    order by p.due_date asc limit 150`, [OPEN])).rows;
+  const soon = (await sql(POSTS + `
+    where p.due_date = current_date + 2 and p.status = any($1)
+    order by p.due_date asc limit 150`, [OPEN])).rows;
+  const finalized = (await sql(POSTS + `
+    where p.status = 'Finalizado' order by u.name nulls last limit 80`)).rows;
+  const routines = (await sql(`select r.title, to_char(r.due_date,'DD/MM') as due,
+      u.id as uid, u.name as resp, u.phone
     from routines r join users u on u.id = r.owner_id
-    where r.due_date is not null and r.due_date <= current_date and r.done = false order by u.id`);
-  const byPhone = {};
-  for (const row of r.rows) { if (!row.phone) continue; (byPhone[row.phone] = byPhone[row.phone] || { name: row.owner, items: [] }).items.push(row); }
+    where r.due_date is not null and r.due_date <= current_date and r.done = false
+    order by r.due_date asc`)).rows;
+
+  const R = router();
+  overdue.forEach((r) => R.put(r, 'overdue'));
+  soon.forEach((r) => R.put(r, 'soon'));
+  finalized.forEach((r) => R.put(r, 'finalized'));
+  // Rotina é pessoal: sem telefone não tem pra onde mandar, e não faz sentido no grupo.
+  routines.forEach((r) => { if (r.phone) R.put(r, 'routines'); });
+
   let dms = 0;
-  for (const phone of Object.keys(byPhone)) {
-    const o = byPhone[phone];
-    const msg = '👋 Oi ' + (o.name || '') + '! Suas rotinas vencidas:\n' + o.items.map((i) => '• ' + i.title + ' (até ' + i.due + ')').join('\n');
-    try { await sendDM(phone, msg); dms++; } catch (e) { /* segue */ }
+  for (const p of R.people.values()) {
+    const blocks = [
+      section('⏰ Atrasados / vence hoje', p.overdue, (r) => label(r) + ' — vence ' + r.due),
+      section('🟡 Faltam 2 dias', p.soon, (r) => label(r) + ' — vence ' + r.due),
+      section('📣 Prontos para publicar', p.finalized, (r) => label(r) + (r.pub_time ? ' · ' + r.pub_time : '')),
+      section('📋 Rotinas vencidas', p.routines, (r) => '• ' + r.title + ' (até ' + r.due + ')'),
+    ].filter(Boolean);
+    if (!blocks.length) continue;
+    const msg = '☀️ *Bom dia, ' + (p.name || '') + '!*\nSeu resumo de hoje:\n\n' + blocks.join('\n\n');
+    try { await sendDM(p.phone, msg); dms++; } catch (e) { /* uma falha não derruba os outros */ }
   }
-  return { routineDMs: dms };
-}
 
-// Posts a 2 dias do prazo de conclusão → grupo (1 msg por post).
-async function reminder() {
-  const p = await sql(`select p.title, to_char(p.due_date,'DD/MM') as due, p.status, c.name as client, u.name as resp
-    from posts p left join clients c on c.id = p.client_id left join users u on u.id = p.responsible_id
-    where p.due_date = current_date + interval '2 day' and p.status = any($1) order by p.due_date`, [OPEN]);
-  let sent = 0;
-  for (const r of p.rows) {
-    await sendGroup('🟡 *Faltam 2 dias para concluir*\n*' + r.title + '* — ' + (r.client || 'sem cliente') + '\nConcluir até ' + r.due + (r.resp ? ' · Resp: ' + r.resp : '') + ' · _' + r.status + '_');
-    sent++;
-  }
-  if (sent) await sql('insert into notifications (text, kind, whatsapp_sent) values ($1,$2,$3)', [sent + ' post(s) a 2 dias do prazo', 'due', true]);
-  return { reminders: sent };
-}
+  const LBL = { overdue: 'atrasado/hoje', soon: 'faltam 2 dias', finalized: 'pronto p/ publicar' };
+  const orphans = await flushOrphans(R.orphans,
+    '⚠️ *Demandas sem DM (' + R.orphans.length + ')*\nNinguém foi avisado no privado — defina o responsável (ou cadastre o telefone dele):\n',
+    (o) => (LBL[o.key] ? ' _(' + LBL[o.key] + ')_' : ''));
 
-// Posts FINALIZADOS aguardando publicação → lembrete no grupo.
-async function finalizedReminder() {
-  const p = await sql(`select p.title, c.name as client, u.name as resp, p.pub_time
-    from posts p left join clients c on c.id = p.client_id left join users u on u.id = p.responsible_id
-    where p.status = 'Finalizado' order by u.name nulls last limit 80`);
-  if (!p.rows.length) return { finalized: 0 };
-  const lines = p.rows.map((r) => '✅ *' + r.title + '* — ' + (r.client || 'sem cliente') + (r.resp ? ' · ' + r.resp : '') + (r.pub_time ? ' · ' + r.pub_time : ''));
-  await sendGroup('📣 *Prontos para publicar (' + p.rows.length + ')*\nFinalizados aguardando publicação:\n\n' + lines.join('\n'));
-  await sql('insert into notifications (text, kind, whatsapp_sent) values ($1,$2,$3)', [p.rows.length + ' finalizado(s) aguardando publicação', 'due', true]);
-  return { finalized: p.rows.length };
+  const note = (text) => sql('insert into notifications (text, kind, whatsapp_sent) values ($1,$2,$3)', [text, 'due', true]);
+  try {
+    if (overdue.length) await note(overdue.length + ' demanda(s) a concluir');
+    if (soon.length) await note(soon.length + ' post(s) a 2 dias do prazo');
+    if (finalized.length) await note(finalized.length + ' finalizado(s) aguardando publicação');
+  } catch (e) {}
+
+  return { posts: overdue.length, soon: soon.length, finalized: finalized.length, routines: routines.length, dms, orphans };
 }
 
 // No dia 1 de cada mês: cria um lembrete por cliente p/ planejar o calendário, atribuído à Chacon.
@@ -91,25 +117,31 @@ async function monthlyClientReminders() {
   return { reminders: created };
 }
 
-// Recap do dia (18h seg–sex): pendências que ainda não foram publicadas.
+// Recap do dia (18h seg–sex): o que PUBLICA amanhã e em que status está,
+// no privado de cada responsável.
 async function digest() {
-  const p = await sql(`select p.title, to_char(p.due_date,'DD/MM') as due, p.status, c.name as client, u.name as resp
-    from posts p left join clients c on c.id = p.client_id left join users u on u.id = p.responsible_id
-    where p.status <> 'Postado' and p.pub_date is not null
-    order by p.due_date nulls last limit 150`);
-  if (!p.rows.length) { await sendGroup('🌙 *Recap do dia* — sem pendências, tudo publicado! 🎉'); return { pending: 0 }; }
-  const byStatus = {};
-  for (const r of p.rows) (byStatus[r.status] = byStatus[r.status] || []).push(r);
-  const order = ['Aguardando aprovação', 'Modificação', 'Em produção', 'Agendado', 'Finalizado'];
-  const blocks = ['🌙 *Recap do dia — pendências (' + p.rows.length + ')*'];
-  for (const s of order) {
-    if (!byStatus[s]) continue;
-    const lines = byStatus[s].map((r) => (ICON[s] || '•') + ' *' + r.title + '* — ' + (r.client || 'sem cliente') + (r.resp ? ' · ' + r.resp : '') + (r.due ? ' · vence ' + r.due : ''));
-    blocks.push('*' + s + ' (' + byStatus[s].length + ')*\n' + lines.join('\n'));
+  const rows = (await sql(POSTS + `
+    where p.pub_date = current_date + 1
+    order by p.pub_time nulls last, c.name nulls last limit 150`)).rows;
+  if (!rows.length) return { tomorrow: 0, dms: 0, orphans: 0 };
+
+  const day = rows[0].pub;
+  const R = router();
+  rows.forEach((r) => R.put(r, 'tomorrow'));
+
+  const line = (r) => label(r) + (r.pub_time ? ' · ' + r.pub_time : '') + ' · _' + r.status + '_';
+  let dms = 0;
+  for (const p of R.people.values()) {
+    const msg = '🌙 *Amanhã (' + day + ') você publica ' + p.tomorrow.length + ':*\n\n' + p.tomorrow.map(line).join('\n');
+    try { await sendDM(p.phone, msg); dms++; } catch (e) {}
   }
-  await sendGroup(blocks.join('\n\n'));
-  await sql('insert into notifications (text, kind, whatsapp_sent) values ($1,$2,$3)', ['Recap: ' + p.rows.length + ' pendência(s)', 'digest', true]);
-  return { pending: p.rows.length };
+
+  const orphans = await flushOrphans(R.orphans,
+    '🌙 *Publica amanhã (' + day + ') e está sem DM (' + R.orphans.length + ')*\n',
+    (o) => (o.row.pub_time ? ' · ' + o.row.pub_time : '') + ' · _' + o.row.status + '_');
+
+  try { await sql('insert into notifications (text, kind, whatsapp_sent) values ($1,$2,$3)', ['Amanhã (' + day + '): ' + rows.length + ' post(s) publicando', 'digest', true]); } catch (e) {}
+  return { tomorrow: rows.length, dms, orphans };
 }
 
 // Faxina de storage: apaga do Vercel Blob os arquivos que nenhum registro referencia
@@ -141,10 +173,7 @@ async function blobGC() {
 // Rotina da manhã: junta tudo (cabe no limite de crons do Hobby).
 async function morning() {
   const out = {};
-  try { Object.assign(out, await overdue()); } catch (e) { out.overdueErr = String(e.message || e); }
-  try { Object.assign(out, await routineDMs()); } catch (e) {}
-  try { Object.assign(out, await reminder()); } catch (e) {}
-  try { Object.assign(out, await finalizedReminder()); } catch (e) {}
+  try { Object.assign(out, await morningDMs()); } catch (e) { out.morningErr = String(e.message || e); }
   try { const m = await monthlyClientReminders(); out.monthly = m.reminders; } catch (e) {}
   try { out.blobGC = await blobGC(); } catch (e) { out.blobGCErr = String(e.message || e); }
   return out;
@@ -158,9 +187,7 @@ export default async function handler(req, res) {
   try {
     let r;
     if (job === 'digest') r = await digest();
-    else if (job === 'reminder') r = await reminder();
-    else if (job === 'overdue') r = await overdue();
-    else if (job === 'finalized') r = await finalizedReminder();
+    else if (job === 'dms') r = await morningDMs();
     else if (job === 'gc') r = await blobGC();
     else r = await morning();
     return res.status(200).json(r);

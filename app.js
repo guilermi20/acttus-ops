@@ -5,8 +5,6 @@ var S = window.Store, st = S.state;
 
 /* ---------- ícones ---------- */
 var ICONS = {
- dashboard:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
- target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4"/>',
  calendar:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
  grid:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>',
  building:'<rect x="4" y="2" width="16" height="20" rx="2"/><line x1="9" y1="6" x2="9.01" y2="6"/><line x1="15" y1="6" x2="15.01" y2="6"/><line x1="9" y1="10" x2="9.01" y2="10"/><line x1="15" y1="10" x2="15.01" y2="10"/><path d="M9 22v-4h6v4"/>',
@@ -27,10 +25,8 @@ var ICONS = {
  alert:'<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
  book:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
- chart:'<line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>',
  link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
  search:'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
- video:'<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>',
  file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>',
  moon:'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
  sun:'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
@@ -101,14 +97,13 @@ function avatar(name, sz) { sz = sz || 26; return '<span class="avt" title="' + 
    ROUTER
    =================================================================== */
 var NAV = [
- { sec: 'Painel', admin: true, items: [{ key: 'dashboard', label: 'Visão geral', icon: 'dashboard' }, { key: 'funil', label: 'Funil 50/30/20', icon: 'target' }, { key: 'dashboards', label: 'Dashboards', icon: 'chart' }] },
- { sec: 'Editorial', items: [{ key: 'calendario', label: 'Calendário', icon: 'calendar' }, { key: 'posts', label: 'Posts', icon: 'grid' }, { key: 'gravacoes', label: 'Gravações', icon: 'video' }, { key: 'minhas', label: 'Minhas demandas', icon: 'check' }, { key: 'rotinas', label: 'Rotinas', icon: 'clock' }, { key: 'ideias', label: 'Banco de ideias', icon: 'zap' }] },
+ { sec: 'Editorial', items: [{ key: 'calendario', label: 'Calendário', icon: 'calendar' }, { key: 'posts', label: 'Posts', icon: 'grid' }, { key: 'minhas', label: 'Minhas demandas', icon: 'check' }, { key: 'rotinas', label: 'Rotinas', icon: 'clock' }, { key: 'ideias', label: 'Banco de ideias', icon: 'zap' }] },
  { sec: 'Operação', items: [{ key: 'agenda', label: 'Agenda', icon: 'agenda' }, { key: 'projetos', label: 'Projetos', icon: 'folder' }, { key: 'reunioes', label: 'Reuniões', icon: 'book' }] },
  { sec: 'Cadastros', items: [{ key: 'clientes', label: 'Clientes', icon: 'building' }, { key: 'usuarios', label: 'Usuários', icon: 'users' }] },
  { sec: 'Integrações', admin: true, items: [{ key: 'api', label: 'API & Integrações', icon: 'key' }] }
 ];
-var VIEWS = { dashboard: renderDashboard, funil: renderFunil, dashboards: renderDashboards, calendario: renderCalendario, posts: renderPosts, gravacoes: renderGravacoes, minhas: renderMinhas, rotinas: renderRotinas, ideias: renderIdeias, agenda: renderAgenda, projetos: renderProjetos, projeto: renderProjeto, reunioes: renderReunioes, reuniao: renderReuniao, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios, api: renderApiKeys };
-var ADMIN_ROUTES = { dashboard: 1, funil: 1, dashboards: 1, api: 1 };
+var VIEWS = { calendario: renderCalendario, posts: renderPosts, minhas: renderMinhas, rotinas: renderRotinas, ideias: renderIdeias, agenda: renderAgenda, projetos: renderProjetos, projeto: renderProjeto, reunioes: renderReunioes, reuniao: renderReuniao, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios, api: renderApiKeys };
+var ADMIN_ROUTES = { api: 1 };
 var route = 'calendario';
 
 function isAdmin() { return !!(st.user && st.user.role === 'admin'); }
@@ -136,7 +131,6 @@ function renderNav() {
 }
 function navCount(k) {
  if (k === 'posts') return st.posts.filter(function (p) { return (p.kind || 'post') === 'post'; }).length;
- if (k === 'gravacoes') return st.posts.filter(function (p) { return p.kind === 'gravacao'; }).length;
  if (k === 'minhas') return st.posts.filter(function (p) { return st.user && p.responsible_id === st.user.id; }).length;
  if (k === 'rotinas') return st.routines.filter(function (r) { return st.user && r.owner_id === st.user.id && !r.done; }).length;
  if (k === 'ideias') return st.ideas.filter(function (i) { return i.status === 'nova'; }).length;
@@ -145,7 +139,7 @@ function navCount(k) {
  if (k === 'api') return st.apiKeys.filter(function (x) { return !x.revoked_at; }).length;
  return '';
 }
-function renderView() { var el = $('#view'); (VIEWS[route] || renderDashboard)(el); }
+function renderView() { var el = $('#view'); (VIEWS[route] || renderCalendario)(el); }
 
 /* ===================================================================
    HEAD (título + ações)
@@ -157,119 +151,8 @@ function kpi(label, value, desc, color) {
  return '<div class="kpi"><div class="ktop"><div class="kl">' + esc(label) + '</div></div><div class="kv ' + (color ? 'c-' + color : '') + '">' + value + '</div><div class="kd">' + esc(desc || '') + '</div></div>';
 }
 
-/* ===================================================================
-   DASHBOARD — visão geral
-   =================================================================== */
-var dashPeriod = 'all', dashFrom = '', dashTo = '';
-function dashRange() {
- var t = new Date(), y = t.getFullYear(), m = t.getMonth();
- function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
- if (dashPeriod === 'month') return [iso(new Date(y, m, 1)), iso(new Date(y, m + 1, 0))];
- if (dashPeriod === 'last') return [iso(new Date(y, m - 1, 1)), iso(new Date(y, m, 0))];
- if (dashPeriod === '30') { var a = new Date(); a.setDate(a.getDate() - 30); return [iso(a), iso(t)]; }
- if (dashPeriod === 'next30') { var b = new Date(); b.setDate(b.getDate() + 30); return [iso(t), iso(b)]; }
- if (dashPeriod === 'custom') return [dashFrom || '', dashTo || ''];
- return ['', ''];
-}
-function renderDashboard(el) {
- var rng = dashRange(), from = rng[0], to = rng[1];
- var posts = st.posts.filter(function (p) {
-  if ((p.kind || 'post') !== 'post') return false;
-  if (from || to) { if (!p.pub_date) return false; if (from && p.pub_date < from) return false; if (to && p.pub_date > to) return false; }
-  return true;
- });
- var total = posts.length;
- var agendados = posts.filter(function (p) { return p.status === 'Agendado'; }).length;
- var postados = posts.filter(function (p) { return p.status === 'Postado'; }).length;
- var vencidos = posts.filter(isOverdue).length;
- var byStatus = STATUS.map(function (s) { return { label: s, n: posts.filter(function (p) { return p.status === s; }).length, color: STATUS_COLOR[s] }; });
-
- var kpis = '<div class="kpis">' +
-  kpi('Posts', total, 'no total') +
-  kpi('Agendados', agendados, 'aguardando publicação', 'blue') +
-  kpi('Postados', postados, 'já publicados', 'green') +
-  kpi('Vencidos', vencidos, 'data passou, não postado', vencidos ? 'red' : 'gray') + '</div>';
-
- var statusPanel = '<div class="panel"><div class="hd"><h3>Posts por status</h3></div><div class="bd">' +
-  byStatus.map(function (s) {
-   var pc = total ? Math.round(s.n / total * 100) : 0;
-   return '<div class="hb"><span class="hbl">' + badge(s.label, s.color) + '</span><span class="hbar"><i class="c-' + s.color + '" style="width:' + pc + '%"></i></span><span class="hbv">' + s.n + '</span></div>';
-  }).join('') + '</div></div>';
-
- var upcoming = posts.filter(function (p) { return p.pub_date && p.pub_date >= todayISO() && p.status !== 'Postado'; })
-  .sort(function (a, b) { return (a.pub_date + a.pub_time) < (b.pub_date + b.pub_time) ? -1 : 1; }).slice(0, 6);
- var upPanel = '<div class="panel"><div class="hd"><h3>Próximas publicações</h3></div><div class="bd">' +
-  (upcoming.length ? upcoming.map(postRow).join('') : '<div class="empty">Nada agendado à frente.</div>') + '</div></div>';
-
- var presetOpts = [['all', 'Tudo'], ['month', 'Este mês'], ['last', 'Mês passado'], ['30', 'Últimos 30 dias'], ['next30', 'Próximos 30 dias'], ['custom', 'Personalizado']].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === dashPeriod ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('');
- var customInputs = dashPeriod === 'custom' ? '<input type="date" class="select" id="dashFrom" value="' + esc(dashFrom) + '"><span class="sub">até</span><input type="date" class="select" id="dashTo" value="' + esc(dashTo) + '">' : '';
- var rangeNote = (from || to) ? '<span class="sub">(' + (from ? fmtDay(from) : '…') + ' – ' + (to ? fmtDay(to) : '…') + ')</span>' : '';
- var filterbar = '<div class="filterbar"><span class="sub">Período:</span><select class="select" id="dashPeriodSel">' + presetOpts + '</select>' + customInputs + rangeNote + '</div>';
-
- el.innerHTML = head('Visão geral', 'Acompanhe a operação do calendário editorial em tempo real.',
-  '<button class="btn pri" data-new="1">' + ic('plus') + ' Novo post</button>') +
-  '<div class="livebar">' + ic('zap', 15) + ' Atualização ao vivo a cada 8s</div>' +
-  filterbar +
-  kpis + '<div class="cols2">' + statusPanel + upPanel + '</div>';
-
- $('#dashPeriodSel', el).onchange = function () { dashPeriod = this.value; renderDashboard(el); };
- var df = $('#dashFrom', el); if (df) df.onchange = function () { dashFrom = this.value; renderDashboard(el); };
- var dt = $('#dashTo', el); if (dt) dt.onchange = function () { dashTo = this.value; renderDashboard(el); };
- bindNew(el); bindPostRows(el);
-}
-function postRow(p) {
- var c = postColor(p);
- return '<div class="arow" data-post="' + p.id + '"><span class="cdot c-' + c + '"></span>' +
-  '<div class="tx"><div class="t">' + esc(p.title) + '</div><div class="m">' + esc(p.client_name || 'Sem cliente') + ' · ' + typeLabel(p.post_type) + ' · ' + funnelMeta(p.funnel_stage).short + '</div></div>' +
-  '<div class="rt">' + badge(p.status, STATUS_COLOR[p.status]) + '<div class="dt">' + fmtDay(p.pub_date) + (p.pub_time ? ' · ' + p.pub_time : '') + '</div></div></div>';
-}
 function bindPostRows(el) { $$('[data-post]', el).forEach(function (r) { r.onclick = function () { var p = postById(r.getAttribute('data-post')); if (p) openPostModal(p); }; }); }
 function postById(id) { for (var i = 0; i < st.posts.length; i++) if (st.posts[i].id === id) return st.posts[i]; return null; }
-
-/* ===================================================================
-   FUNIL 50/30/20
-   =================================================================== */
-var funilClient = '';
-function renderFunil(el) {
- var posts = st.posts.filter(function (p) { return (p.kind || 'post') === 'post' && (!funilClient || p.client_id === funilClient); });
- var total = posts.length;
- var counts = { topo: 0, meio: 0, fundo: 0 };
- posts.forEach(function (p) { counts[p.funnel_stage] = (counts[p.funnel_stage] || 0) + 1; });
-
- var bars = FUNNEL.map(function (f) {
-  var n = counts[f.key] || 0, pc = total ? Math.round(n / total * 100) : 0;
-  var diff = pc - f.target, ok = Math.abs(diff) <= 7;
-  return '<div class="fn">' +
-   '<div class="fn-top"><span class="fn-name">' + badge(f.label, f.color) + '</span>' +
-   '<span class="fn-pct">' + pc + '% <small>· meta ' + f.target + '%</small></span></div>' +
-   '<div class="fn-track"><i class="c-' + f.color + '" style="width:' + pc + '%"></i><span class="fn-target" style="left:' + f.target + '%"></span></div>' +
-   '<div class="fn-foot"><span>' + n + ' post' + (n === 1 ? '' : 's') + '</span>' +
-   '<span class="fn-verdict ' + (ok ? 'ok' : 'off') + '">' + (ok ? ic('check', 14) + ' na meta' : ic('alert', 14) + (diff > 0 ? ' +' : ' ') + diff + 'pp') + '</span></div></div>';
- }).join('');
-
- var globalOk = FUNNEL.every(function (f) { var pc = total ? Math.round((counts[f.key] || 0) / total * 100) : 0; return Math.abs(pc - f.target) <= 7; });
-
- // por cliente
- var rows = st.clients.map(function (cl) {
-  var cp = st.posts.filter(function (p) { return p.client_id === cl.id; });
-  if (!cp.length) return '';
-  var t = cp.length;
-  var cells = FUNNEL.map(function (f) { var n = cp.filter(function (p) { return p.funnel_stage === f.key; }).length; return '<td>' + (t ? Math.round(n / t * 100) : 0) + '%</td>'; }).join('');
-  var ok = FUNNEL.every(function (f) { var n = cp.filter(function (p) { return p.funnel_stage === f.key; }).length; return Math.abs((t ? Math.round(n / t * 100) : 0) - f.target) <= 10; });
-  return '<tr><td class="cn"><span class="cdot c-' + (cl.is_internal ? 'yellow' : 'pink') + '"></span><button class="linklike" data-cli="' + cl.id + '">' + esc(cl.name) + '</button></td>' + cells + '<td>' + t + '</td><td><button class="tag ' + (ok ? 'ok' : 'off') + '" data-cli="' + cl.id + '" title="Abrir calendário do cliente">' + (ok ? 'ok ' : 'Ajustar ') + ic('right', 12) + '</button></td></tr>';
- }).join('');
-
- var clientOpts = '<option value="">Todos os clientes</option>' + st.clients.map(function (c) { return '<option value="' + c.id + '"' + (c.id === funilClient ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('');
-
- el.innerHTML = head('Funil 50/30/20', 'Distribuição dos posts por etapa de funil vs. a meta 50% topo / 30% meio / 20% fundo.',
-  '<select class="select" id="fnCli">' + clientOpts + '</select>') +
-  '<div class="meta-banner ' + (globalOk ? 'ok' : 'off') + '">' + (globalOk ? ic('check') + ' Dentro da meta 50/30/20' : ic('alert') + ' Fora da meta 50/30/20 — ajuste o mix de conteúdo') + '<span class="mb-total">' + total + ' posts</span></div>' +
-  '<div class="panel"><div class="bd fn-wrap">' + (total ? bars : '<div class="empty">Sem posts para este filtro.</div>') + '</div></div>' +
-  '<div class="panel"><div class="hd"><h3>Por cliente</h3></div><div class="bd"><table class="tbl"><thead><tr><th>Cliente</th><th>Topo</th><th>Meio</th><th>Fundo</th><th>Total</th><th>Meta</th></tr></thead><tbody>' + (rows || '<tr><td colspan="6" class="empty">Sem dados.</td></tr>') + '</tbody></table></div></div>';
-
- $('#fnCli', el).onchange = function () { funilClient = this.value; renderFunil(el); };
- $$('[data-cli]', el).forEach(function (b) { b.onclick = function () { openCliente(b.getAttribute('data-cli')); }; });
-}
 
 /* ===================================================================
    CALENDÁRIO unificado
@@ -511,26 +394,6 @@ function renderPosts(el) {
  $('#bFun', el).onchange = function () { boardFunnel = this.value; renderPosts(el); };
  $('#bResp', el).onchange = function () { boardResp = this.value; renderPosts(el); };
  bindNew(el); bindBoard(el);
-}
-function renderGravacoes(el) {
- var list = st.posts.filter(function (p) {
-  if (p.kind !== 'gravacao') return false;
-  if (boardCli && p.client_id !== boardCli) return false;
-  if (boardResp === 'none') { if (p.responsible_id) return false; }
-  else if (boardResp && p.responsible_id !== boardResp) return false;
-  return true;
- });
- var clientOpts = '<option value="">Todos os clientes</option>' + st.clients.map(function (c) { return '<option value="' + c.id + '"' + (c.id === boardCli ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('');
- var respOpts = '<option value="">Todos os responsáveis</option>' + (st.users || []).map(function (u) { return '<option value="' + u.id + '"' + (u.id === boardResp ? ' selected' : '') + '>' + esc(u.name) + '</option>'; }).join('');
- el.innerHTML = head('Gravações', 'Demandas de gravação — arraste entre as colunas. Mesmas notificações das demandas.',
-  '<select class="select" id="gCli">' + clientOpts + '</select>' +
-  '<select class="select" id="gResp">' + respOpts + '</select>' +
-  '<button class="btn pri" data-newgrav="1">' + ic('plus') + ' Nova gravação</button>') +
-  '<div class="board">' + statusColumns(list) + '</div>';
- $('#gCli', el).onchange = function () { boardCli = this.value; renderGravacoes(el); };
- $('#gResp', el).onchange = function () { boardResp = this.value; renderGravacoes(el); };
- $$('[data-newgrav]', el).forEach(function (b) { b.onclick = function () { openPostModal(null, { kind: 'gravacao' }); }; });
- bindBoard(el);
 }
 // Linha de demanda priorizada (mostra o prazo de CONCLUSÃO).
 function priorityRow(p) {
@@ -798,7 +661,7 @@ function openUserModal(user) {
   '<label class="fld"><span>CPF</span><input id="uCpf" inputmode="numeric" value="' + esc(u.cpf || '') + '" placeholder="000.000.000-00"></label>' +
   '<label class="fld"><span>Email</span><input id="uEmail" type="email" value="' + esc(u.email || '') + '" placeholder="pessoa@acttus.com.br"></label>' +
   '<label class="fld"><span>Telefone (com DDI — usado nos avisos de rotina no WhatsApp)</span><input id="uPhone" inputmode="numeric" value="' + esc(u.phone || '') + '" placeholder="5511999999999"></label>' +
-  (isAdmin() ? '<label class="fld"><span>Perfil</span><select id="uRole"><option value="member"' + (u.role !== 'admin' ? ' selected' : '') + '>Membro</option><option value="admin"' + (u.role === 'admin' ? ' selected' : '') + '>Admin (vê dashboards)</option></select></label>' : ''),
+  (isAdmin() ? '<label class="fld"><span>Perfil</span><select id="uRole"><option value="member"' + (u.role !== 'admin' ? ' selected' : '') + '>Membro</option><option value="admin"' + (u.role === 'admin' ? ' selected' : '') + '>Admin (vê API &amp; Integrações)</option></select></label>' : ''),
   function () {
    var name = $('#uNome').value.trim(), cpf = onlyDigits($('#uCpf').value), email = $('#uEmail').value.trim();
    if (!name || !cpf || !email) { toast('Preencha nome, CPF e email', 'err'); return false; }
@@ -1159,54 +1022,6 @@ function openTaskModal(task, projectId) {
  if (editing) $('#tkDel').onclick = function () { if (!confirm('Excluir esta tarefa?')) return; S.deleteProjectTask(task.id).then(function () { toast('Tarefa excluída'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); }); };
 }
 
-/* ===================================================================
-   DASHBOARDS (somente admin)
-   =================================================================== */
-function dashBars(pairs, colorOf) {
- var max = 0; pairs.forEach(function (p) { if (p[1] > max) max = p[1]; }); max = max || 1;
- return pairs.map(function (p) { var c = colorOf ? colorOf(p[0]) : 'yellow'; return '<div class="hb"><span class="hbl">' + esc(p[0]) + '</span><span class="hbar"><i class="c-' + c + '" style="width:' + Math.round(p[1] / max * 100) + '%"></i></span><span class="hbv">' + p[1] + '</span></div>'; }).join('') || '<div class="empty">Sem dados.</div>';
-}
-function dashPanel(title, body) { return '<div class="panel"><div class="hd"><h3>' + esc(title) + '</h3></div><div class="bd">' + body + '</div></div>'; }
-function renderDashboards(el) {
- if (!isAdmin()) { go('calendario'); return; }
- var posts = st.posts.filter(function (p) { return (p.kind || 'post') === 'post'; }), today = todayISO();
- var byResp = {}; posts.forEach(function (p) { var k = p.responsible_name || 'Sem responsável'; byResp[k] = (byResp[k] || 0) + 1; });
- var d1 = dashBars(Object.keys(byResp).map(function (k) { return [k, byResp[k]]; }).sort(function (a, b) { return b[1] - a[1]; }));
- var d5 = dashBars(STATUS.map(function (s) { return [s, posts.filter(function (p) { return p.status === s; }).length]; }), function (s) { return STATUS_COLOR[s]; });
- var chanO = posts.filter(function (p) { return p.channel !== 'trafego'; }).length, chanT = posts.length - chanO;
- var d3 = dashBars([['Orgânico', chanO], ['Tráfego', chanT]], function () { return 'blue'; });
- var d4 = dashBars(TYPES.map(function (t) { return [t.label, posts.filter(function (p) { return p.post_type === t.key; }).length]; }), function () { return 'purple'; });
- var venc = posts.filter(isOverdue).length;
- var em2 = posts.filter(function (p) { return p.due_date && p.due_date >= today && diffDays(today, p.due_date) <= 2 && isOpen(p); }).length;
- var semana = posts.filter(function (p) { return p.due_date && p.due_date >= today && diffDays(today, p.due_date) <= 7 && isOpen(p); }).length;
- var totalP = posts.length, postados = posts.filter(function (p) { return p.status === 'Postado'; }).length;
- var pctPub = totalP ? Math.round(postados / totalP * 100) : 0;
- var d2 = st.clients.map(function (c) {
-  var cp = posts.filter(function (p) { return p.client_id === c.id; }); if (!cp.length) return '';
-  var pub = cp.filter(function (p) { return p.status === 'Postado'; }).length, ov = cp.filter(isOverdue).length;
-  return '<tr><td class="cn"><span class="cdot c-' + (c.is_internal ? 'yellow' : 'pink') + '"></span>' + esc(c.name) + '</td><td>' + cp.length + '</td><td>' + pub + '</td><td>' + (ov ? '<span class="c-red">' + ov + '</span>' : '0') + '</td></tr>';
- }).join('') || '<tr><td colspan="4" class="empty">Sem dados.</td></tr>';
- var d9 = st.projects.map(function (p) { return '<tr><td>' + esc(p.name) + '</td><td>' + esc(p.status) + '</td><td>' + (p.done_count || 0) + '/' + (p.task_count || 0) + '</td></tr>'; }).join('') || '<tr><td colspan="3" class="empty">Sem projetos.</td></tr>';
-
- el.innerHTML = head('Dashboards', 'Visão analítica da operação (acesso de admin).', '') +
-  '<div class="dashgrid">' +
-   dashPanel('Produção por responsável', d1) +
-   dashPanel('Pipeline de status', d5) +
-   dashPanel('Orgânico × Tráfego', d3) +
-   dashPanel('Tipos de conteúdo', d4) +
-   dashPanel('Pontualidade / Atrasos', '<div class="kpis">' + kpi('Vencidos', venc, 'a concluir, atrasados', venc ? 'red' : 'gray') + kpi('≤ 2 dias', em2, 'do prazo de conclusão', 'amber') + kpi('Nesta semana', semana, 'a concluir em 7 dias', 'blue') + '</div>') +
-   dashPanel('Publicação', '<div class="kpis">' + kpi('Publicados', postados, 'status Postado', 'green') + kpi('Faltam', totalP - postados, 'ainda não postados', 'amber') + kpi('% publicado', pctPub + '%', 'do total', 'yellow') + '</div>') +
-   dashPanel('Desempenho por cliente', '<table class="tbl"><thead><tr><th>Cliente</th><th>Posts</th><th>Postados</th><th>Vencidos</th></tr></thead><tbody>' + d2 + '</tbody></table>') +
-   '<div class="panel"><div class="hd"><h3>Rotinas por usuário</h3></div><div class="bd" id="dashRoutines"><div class="empty">Carregando…</div></div></div>' +
-   dashPanel('Projetos', '<table class="tbl"><thead><tr><th>Projeto</th><th>Status</th><th>Tarefas</th></tr></thead><tbody>' + d9 + '</tbody></table>') +
-  '</div>';
- S.allRoutines().then(function (rs) {
-  var elp = $('#dashRoutines'); if (!elp) return;
-  var byU = {}; rs.forEach(function (r) { var k = r.owner_name || '—'; (byU[k] = byU[k] || { pend: 0, done: 0 })[r.done ? 'done' : 'pend']++; });
-  var rows = Object.keys(byU).map(function (k) { return '<tr><td>' + esc(k) + '</td><td>' + byU[k].pend + '</td><td>' + byU[k].done + '</td></tr>'; }).join('') || '<tr><td colspan="3" class="empty">Sem rotinas.</td></tr>';
-  elp.innerHTML = '<table class="tbl"><thead><tr><th>Usuário</th><th>Pendentes</th><th>Concluídas</th></tr></thead><tbody>' + rows + '</tbody></table>';
- }).catch(function () { var elp = $('#dashRoutines'); if (elp) elp.innerHTML = '<div class="empty">Não foi possível carregar.</div>'; });
-}
 
 /* ===================================================================
    BANCO DE IDEIAS

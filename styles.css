@@ -442,6 +442,14 @@ img.pp-media.zoomable{cursor:zoom-in}
 .ag-t{flex:0 0 auto;min-width:52px;font-size:12.5px;font-weight:700;color:var(--ink2);font-variant-numeric:tabular-nums}
 .note code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;background:rgba(0,0,0,.25);border-radius:5px;padding:1px 5px}
 
+/* ---------- EMBED de terceiro (Google Agenda) ---------- */
+/* O iframe vinha 800x600 fixo, o que quebraria o layout no celular. Aqui ele é
+   fluido. O embed do Google é sempre claro: fundo branco e cantos arredondados
+   para parecer intencional no tema escuro, em vez de um retângulo solto. */
+.embed{width:100%;height:min(68vh,640px);min-height:420px;border-radius:10px;overflow:hidden;background:#fff}
+.embed iframe{display:block;width:100%;height:100%;border:0}
+@media(max-width:700px){.embed{height:70dvh;min-height:340px}}
+
 /* chips de filtro (etapas do cliente) */
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;border-radius:20px;padding:7px 13px;border:1px solid var(--line2);background:var(--panel2);color:var(--ink2);transition:.12s}

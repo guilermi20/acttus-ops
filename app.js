@@ -35,6 +35,7 @@ var ICONS = {
  copy:'<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
  key:'<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>',
  menu:'<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>',
+ video:'<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>',
  agenda:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="7" y1="14" x2="12" y2="14"/><line x1="7" y1="18" x2="15" y2="18"/>'
 };
 function ic(n, s) { return '<svg class="i" width="' + (s || 18) + '" height="' + (s || 18) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[n] || ICONS.dot) + '</svg>'; }
@@ -98,11 +99,11 @@ function avatar(name, sz) { sz = sz || 26; return '<span class="avt" title="' + 
    =================================================================== */
 var NAV = [
  { sec: 'Editorial', items: [{ key: 'calendario', label: 'Calendário', icon: 'calendar' }, { key: 'posts', label: 'Posts', icon: 'grid' }, { key: 'minhas', label: 'Minhas demandas', icon: 'check' }, { key: 'rotinas', label: 'Rotinas', icon: 'clock' }, { key: 'ideias', label: 'Banco de ideias', icon: 'zap' }] },
- { sec: 'Operação', items: [{ key: 'agenda', label: 'Agenda', icon: 'agenda' }, { key: 'projetos', label: 'Projetos', icon: 'folder' }, { key: 'reunioes', label: 'Reuniões', icon: 'book' }] },
+ { sec: 'Operação', items: [{ key: 'agenda', label: 'Agenda', icon: 'agenda' }, { key: 'gravacoes', label: 'Gravações', icon: 'video' }, { key: 'projetos', label: 'Projetos', icon: 'folder' }, { key: 'reunioes', label: 'Reuniões', icon: 'book' }] },
  { sec: 'Cadastros', items: [{ key: 'clientes', label: 'Clientes', icon: 'building' }, { key: 'usuarios', label: 'Usuários', icon: 'users' }] },
  { sec: 'Integrações', admin: true, items: [{ key: 'api', label: 'API & Integrações', icon: 'key' }] }
 ];
-var VIEWS = { calendario: renderCalendario, posts: renderPosts, minhas: renderMinhas, rotinas: renderRotinas, ideias: renderIdeias, agenda: renderAgenda, projetos: renderProjetos, projeto: renderProjeto, reunioes: renderReunioes, reuniao: renderReuniao, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios, api: renderApiKeys };
+var VIEWS = { calendario: renderCalendario, posts: renderPosts, minhas: renderMinhas, rotinas: renderRotinas, ideias: renderIdeias, agenda: renderAgenda, gravacoes: renderGravacoes, projetos: renderProjetos, projeto: renderProjeto, reunioes: renderReunioes, reuniao: renderReuniao, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios, api: renderApiKeys };
 var ADMIN_ROUTES = { api: 1 };
 var route = 'calendario';
 
@@ -545,6 +546,59 @@ function paintAgenda() {
    }).join('') + '</div>';
  }).join('');
  b.innerHTML = warn + '<div class="panel"><div class="bd">' + html + '</div></div>';
+}
+
+/* ===================================================================
+   GRAVAÇÕES — agenda do Google (visualização) + Calendly (agendamento)
+   =================================================================== */
+var GRAV_CAL = 'c_e9eb0aa0d624ca7599756ac116a676f209c8957e9886f20b9745a9c67d696048@group.calendar.google.com';
+var CALENDLY_URL = 'https://calendly.com/contato-acttusco/gravacao';
+
+// O embed do Google não é responsivo: a grade da semana fica ilegível no
+// celular, então lá trocamos para a visão de agenda (lista).
+function gravIsMobile() { return window.matchMedia('(max-width: 700px)').matches; }
+function gravEmbedUrl() {
+ return 'https://calendar.google.com/calendar/embed?src=' + encodeURIComponent(GRAV_CAL) +
+  '&ctz=' + encodeURIComponent(TZ_AG) +
+  '&mode=' + (gravIsMobile() ? 'AGENDA' : 'WEEK') +
+  '&wkst=2&showTitle=0&showPrint=0&showCalendars=0&showTz=0';
+}
+
+// Calendly é script de terceiro — bloqueador de anúncio ou rede ruim derrubam.
+// Se não carregar, o botão abre o link numa aba: agendar nunca fica inacessível.
+var calendlyLoad = null;
+function loadCalendly() {
+ if (calendlyLoad) return calendlyLoad;
+ calendlyLoad = new Promise(function (ok, fail) {
+  var css = document.createElement('link');
+  css.rel = 'stylesheet'; css.href = 'https://assets.calendly.com/assets/external/widget.css';
+  document.head.appendChild(css);
+  var s = document.createElement('script');
+  s.src = 'https://assets.calendly.com/assets/external/widget.js'; s.async = true;
+  s.onload = function () { if (window.Calendly) ok(); else fail(new Error('Calendly indisponível')); };
+  s.onerror = function () { fail(new Error('script bloqueado')); };
+  document.head.appendChild(s);
+ });
+ return calendlyLoad;
+}
+function openCalendly() {
+ loadCalendly()
+  .then(function () { window.Calendly.initPopupWidget({ url: CALENDLY_URL }); })
+  .catch(function () { window.open(CALENDLY_URL, '_blank', 'noopener'); });
+}
+
+function renderGravacoes(el) {
+ var url = gravEmbedUrl();
+ // Mudança em qualquer post re-renderiza a view; recriar o iframe faria o
+ // calendário recarregar do zero. Se já está montado igual, não mexe.
+ var cur = $('#gravFrame', el);
+ if (cur && cur.getAttribute('src') === url) return;
+ el.innerHTML = head('Gravações', 'Agenda de gravações da Acttus. Para reservar um horário, use “Agendar gravação”.',
+  '<button class="btn pri" id="gravNew">' + ic('plus') + ' Agendar gravação</button>') +
+  '<div class="panel"><div class="bd"><div class="embed">' +
+   '<iframe id="gravFrame" src="' + esc(url) + '" title="Agenda de gravações" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>' +
+  '</div></div></div>';
+ $('#gravNew', el).onclick = openCalendly;
 }
 
 function clientAvatar(c, sz) {

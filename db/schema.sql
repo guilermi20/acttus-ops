@@ -14,6 +14,10 @@ create table if not exists clients (
   created_at timestamptz not null default now()
 );
 create unique index if not exists clients_share_token_idx on clients(share_token);
+-- Id da oportunidade/contato no GHL: é o que torna o webhook idempotente
+-- (o GHL reenvia o mesmo evento quando não recebe 200 na primeira tentativa).
+alter table clients add column if not exists ghl_id text;
+create unique index if not exists clients_ghl_id_idx on clients(ghl_id) where ghl_id is not null;
 -- Etapa do ciclo de vida: onboarding | ongoing | offboarding | churn.
 -- ALTER à parte porque o "create table if not exists" acima não altera banco já existente.
 -- Sem check constraint (mesmo padrão de ideas.status): quem valida é a API, único escritor.
@@ -27,6 +31,7 @@ create table if not exists ideas (
   notes text not null default '',
   status text not null default 'nova',
   source text not null default 'painel',
+  sector text not null default 'marketing',
   created_at timestamptz not null default now()
 );
 
@@ -37,8 +42,12 @@ create table if not exists users (
   email text not null,
   phone text,
   role text not null default 'member',
+  sectors jsonb not null default '["marketing"]',
   created_at timestamptz not null default now()
 );
+-- Setores que a pessoa acessa (marketing | trafego). Admin transita em todos,
+-- independente do que estiver aqui. Quem já existia continua no marketing.
+alter table users add column if not exists sectors jsonb not null default '["marketing"]';
 
 create table if not exists posts (
   id uuid primary key default gen_random_uuid(),
@@ -59,6 +68,7 @@ create table if not exists posts (
   media jsonb not null default '[]',
   kind text not null default 'post',
   date_moved text,
+  sector text not null default 'marketing',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -85,6 +95,7 @@ create table if not exists meetings (
   participants jsonb not null default '[]',
   attachments jsonb not null default '[]',
   notes text not null default '',
+  sector text not null default 'marketing',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -109,6 +120,7 @@ create table if not exists projects (
   responsible_id uuid references users(id) on delete set null,
   status text not null default 'Ativo',
   attachments jsonb not null default '[]',
+  sector text not null default 'marketing',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -124,6 +136,52 @@ create table if not exists project_tasks (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- SETORES ------------------------------------------------------------------
+-- A agência opera em dois setores (marketing | trafego). Os clientes são
+-- compartilhados; o resto do conteúdo pertence a um setor só. Sem check
+-- constraint pelo mesmo motivo de clients.stage: quem valida é a API.
+-- Estes ALTERs existem para bancos criados antes desta mudança.
+alter table posts    add column if not exists sector text not null default 'marketing';
+alter table ideas    add column if not exists sector text not null default 'marketing';
+alter table meetings add column if not exists sector text not null default 'marketing';
+alter table projects add column if not exists sector text not null default 'marketing';
+create index if not exists posts_sector_idx on posts(sector);
+
+-- Campanhas de tráfego pago (a área de Tráfego do painel).
+create table if not exists campaigns (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references clients(id) on delete set null,
+  name text not null,
+  platform text not null default 'meta',
+  objective text not null default '',
+  status text not null default 'Planejamento',
+  budget numeric(12,2),
+  start_date date,
+  end_date date,
+  responsible_id uuid references users(id) on delete set null,
+  notes text not null default '',
+  attachments jsonb not null default '[]',
+  sector text not null default 'trafego',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists campaigns_client_idx on campaigns(client_id);
+
+-- Log cru dos webhooks recebidos (hoje: GHL). Guardamos o payload inteiro
+-- ANTES de processar: é o que permite depurar e evoluir o mapeamento de
+-- campos sem depender de acertar o formato de primeira.
+create table if not exists webhook_events (
+  id uuid primary key default gen_random_uuid(),
+  source text not null default 'ghl',
+  event text not null default '',
+  payload jsonb not null default '{}',
+  client_id uuid references clients(id) on delete set null,
+  status text not null default 'received',
+  error text,
+  created_at timestamptz not null default now()
+);
+create index if not exists webhook_events_created_idx on webhook_events(created_at desc);
 
 -- Chaves de API para integrações externas (Zapier, Make, n8n, etc.).
 -- A chave completa é mostrada só na criação; guardamos apenas o hash (sha256).

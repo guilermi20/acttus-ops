@@ -72,13 +72,28 @@ Entra-se com **CPF + email** cadastrados. O seed cria logins de exemplo (CPFs pl
 Entre com o Admin, cadastre os usuários reais (com CPF e email de verdade) em **Usuários**,
 e depois ajuste/remova os de exemplo.
 
+## Setores
+A agência opera em dois setores: **Marketing** e **Tráfego**. O seletor no topo
+do menu lateral troca o setor ativo (no espírito do seletor de subcontas do GHL)
+e o painel inteiro acompanha: posts, ideias, projetos, reuniões e campanhas
+pertencem a um setor; **clientes e usuários são compartilhados**.
+
+Em **Usuários**, o admin marca quais setores cada pessoa acessa — quem tem um
+setor só nem vê o seletor. Admin transita em todos.
+
+Para criar um setor novo: uma linha em [`lib/sectors.js`](lib/sectors.js) (servidor)
+e uma em `SECTORS`, no topo de [`data.js`](data.js) (navegador).
+
 ## Funcionalidades
 - **Calendário** unificado por cliente — amarelo = `Acttus - Interno`, rosa = demais clientes.
 - **Posts**: board com os 6 status (Agendado → Em produção → Aguardando aprovação → Modificação → Finalizado → Postado), arrasta-e-solta.
 - **Funil 50/30/20**: distribuição topo/meio/fundo vs. meta, geral e por cliente.
 - **Campos do post**: título, cliente, etapa do funil, tipo (carrossel/reels/estático), canal (orgânico/tráfego), data, horário (12:00/18:00), responsável (lista dinâmica dos usuários), status, observações.
+- **Gravações**: agenda do Google embutida + agendamento pelo Calendly. É a agenda do app.
+- **Campanhas** (setor Tráfego): mídia paga por cliente — plataforma, objetivo, verba, período, responsável e status.
 - **Usuários/Clientes**: cadastro próprio. O dropdown de responsável puxa os usuários automaticamente.
 - **WhatsApp**: cron diário envia ao grupo o resumo das tarefas vencidas.
+- **Onboarding automático**: ao marcar o cliente como ganho no CRM (GHL), um webhook cria o cliente em `onboarding` e avisa o grupo com o link do Calendly. Veja [`API.md`](API.md#webhooks-de-entrada).
 
 ## API pública (integrações externas)
 O app é plugável via **API por chave** (`/api/v1/*`) — para Zapier, Make, n8n, Custom GPT, etc.

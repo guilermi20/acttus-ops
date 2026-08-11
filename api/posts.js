@@ -1,4 +1,5 @@
-import { sql, requireAuth, verifyToken } from '../lib/db.js';
+import { sql, requireAuthUser, verifyToken } from '../lib/db.js';
+import { sectorsOf, validSector } from '../lib/sectors.js';
 import { sendGroup, sendDM } from '../lib/whatsapp.js';
 import { del } from '@vercel/blob';
 import { handleUpload } from '@vercel/blob/client';
@@ -33,7 +34,7 @@ function clean(body) {
 const SELECT = `
   select p.id, p.client_id, p.title, p.funnel_stage, p.post_type, p.channel, p.status,
          p.notes, to_char(p.pub_date,'YYYY-MM-DD') as pub_date, to_char(p.due_date,'YYYY-MM-DD') as due_date, p.pub_time,
-         p.responsible_id, p.reject_reason, p.caption, p.media, p.kind, p.date_moved, p.created_at, p.updated_at,
+         p.responsible_id, p.reject_reason, p.caption, p.media, p.kind, p.date_moved, p.sector, p.created_at, p.updated_at,
          c.name as client_name, c.is_internal, u.name as responsible_name
   from posts p
   left join clients c on c.id = p.client_id
@@ -62,10 +63,13 @@ async function handleBlobUpload(req, res) {
 
 export default async function handler(req, res) {
   if (req.query && req.query.action === 'upload') return handleBlobUpload(req, res);
-  if (!requireAuth(req, res)) return;
+  const me = await requireAuthUser(req, res);
+  if (!me) return;
+  // Cada post pertence a um setor; a pessoa só enxerga (e só escreve n)os seus.
+  const mine = sectorsOf(me);
   try {
     if (req.method === 'GET') {
-      const { rows } = await sql(SELECT + ' order by p.pub_date nulls last, p.pub_time nulls last, p.created_at');
+      const { rows } = await sql(SELECT + ' where p.sector = any($1::text[]) order by p.pub_date nulls last, p.pub_time nulls last, p.created_at', [mine]);
       const { rows: nowRows } = await sql`select now() as now`;
       return res.status(200).json({ posts: rows, now: nowRows[0].now });
     }
@@ -73,13 +77,15 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const o = clean(req.body || {});
       if (!o.title) return res.status(400).json({ error: 'Título é obrigatório' });
+      const sector = validSector((req.body || {}).sector) || mine[0];
+      if (!mine.includes(sector)) return res.status(403).json({ error: 'Você não tem acesso ao setor "' + sector + '"' });
       o.funnel_stage = o.funnel_stage || 'topo';
       o.post_type = o.post_type || 'estatico';
       o.channel = o.channel || 'organico';
       o.status = o.status || 'Agendado';
       const { rows } = await sql`
-        insert into posts (client_id, title, funnel_stage, post_type, channel, status, notes, pub_date, due_date, pub_time, responsible_id, caption, media, kind)
-        values (${o.client_id}, ${o.title}, ${o.funnel_stage}, ${o.post_type}, ${o.channel}, ${o.status}, ${o.notes || ''}, ${o.pub_date}, ${o.due_date}, ${o.pub_time}, ${o.responsible_id}, ${o.caption || ''}, ${JSON.stringify(o.media || [])}::jsonb, ${o.kind || 'post'})
+        insert into posts (client_id, title, funnel_stage, post_type, channel, status, notes, pub_date, due_date, pub_time, responsible_id, caption, media, kind, sector)
+        values (${o.client_id}, ${o.title}, ${o.funnel_stage}, ${o.post_type}, ${o.channel}, ${o.status}, ${o.notes || ''}, ${o.pub_date}, ${o.due_date}, ${o.pub_time}, ${o.responsible_id}, ${o.caption || ''}, ${JSON.stringify(o.media || [])}::jsonb, ${o.kind || 'post'}, ${sector})
         returning id`;
       const { rows: full } = await sql(SELECT + ' where p.id = $1', [rows[0].id]);
       return res.status(201).json(full[0]);
@@ -109,7 +115,9 @@ export default async function handler(req, res) {
       const sets = keys.map((k, i) => (k === 'media' ? k + ' = $' + (i + 1) + '::jsonb' : k + ' = $' + (i + 1))).join(', ');
       const vals = keys.map((k) => (k === 'media' ? JSON.stringify(o[k] || []) : o[k]));
       vals.push(id);
-      const upd = await sql('update posts set ' + sets + ', updated_at = now() where id = $' + vals.length + ' returning id', vals);
+      const idPos = vals.length;
+      vals.push(mine);
+      const upd = await sql('update posts set ' + sets + ', updated_at = now() where id = $' + idPos + ' and sector = any($' + vals.length + '::text[]) returning id', vals);
       if (!upd.rows.length) return res.status(404).json({ error: 'Post não encontrado' });
       const { rows: full } = await sql(SELECT + ' where p.id = $1', [id]);
       const post = full[0];
@@ -142,7 +150,8 @@ export default async function handler(req, res) {
       if (!id) return res.status(400).json({ error: 'id é obrigatório' });
       // apaga os arquivos do Blob antes de excluir o registro
       try { const m = await sql('select media from posts where id = $1', [id]); for (const a of ((m.rows[0] && m.rows[0].media) || [])) { if (a && a.url) { try { await del(a.url); } catch (e) {} } } } catch (e) {}
-      await sql('delete from posts where id = $1', [id]);
+      const dl = await sql('delete from posts where id = $1 and sector = any($2::text[]) returning id', [id, mine]);
+      if (!dl.rows.length) return res.status(404).json({ error: 'Post não encontrado' });
       return res.status(200).json({ ok: true });
     }
 

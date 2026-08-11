@@ -79,10 +79,42 @@ Todos seguem o mesmo padrão REST:
 | `ideas` | Banco de ideias | ✅ |
 | `projects` | Projetos internos | ✅ |
 | `project-tasks` | Tarefas de projeto | ✅ |
+| `campaigns` | Campanhas de tráfego pago | ✅ |
 | `meetings` | Reuniões / atas | ✅ |
 | `routines` | Rotinas / tarefas pessoais | ✅ |
 | `users` | Equipe (sem CPF) | ❌ só leitura |
 | `notifications` | Notificações | ❌ só leitura |
+| `webhook-events` | Webhooks recebidos, com o payload cru | ❌ só leitura |
+
+> **Setores.** `posts`, `ideas`, `projects`, `meetings` e `campaigns` têm o campo
+> `sector` (`marketing` \| `trafego`), que também funciona como filtro:
+> `GET /api/v1/posts?sector=trafego`. Quem cria pela API e não informa o setor
+> cai no padrão da tabela (`marketing`; `trafego` em campanhas).
+
+### Webhooks de entrada
+
+| Método | Rota | Descrição | Escopo |
+|---|---|---|---|
+| POST | `/api/v1/webhooks/ghl` | CRM (GoHighLevel): oportunidade ganha → cria o cliente e avisa o grupo | write |
+
+Configure no workflow do GHL uma ação **Webhook** apontando para
+`https://SEU-APP/api/v1/webhooks/ghl`, com o header `X-Api-Key: SUA_CHAVE`
+(uma chave com escopo `write`), no gatilho de **oportunidade ganha**.
+
+O que acontece a cada chamada:
+
+1. O payload inteiro é gravado em `webhook_events` — consulte com
+   `GET /api/v1/webhook-events` para ver exatamente o que o GHL enviou.
+2. Se o cliente ainda não existe, ele é criado com etapa **onboarding**.
+   O `ghl_id` guardado torna o webhook idempotente: reenvios do mesmo evento
+   não duplicam o cliente nem repetem o aviso (a resposta traz `duplicate: true`).
+3. O grupo do WhatsApp recebe o **aviso de novo onboarding**, com o link do
+   Calendly (`CALENDLY_ONBOARDING_URL`, que por padrão é o mesmo link das
+   gravações) e o link do painel do cliente.
+
+A resposta é sempre `200` — inclusive quando não dá para identificar o cliente —
+para o GHL não ficar reenviando. O motivo fica em `webhook_events.status`
+(`created`, `created_no_whatsapp`, `duplicate`, `skipped`, `error`).
 
 ---
 

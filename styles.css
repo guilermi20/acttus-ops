@@ -258,6 +258,27 @@ select.select{appearance:none;-webkit-appearance:none;padding-right:30px;backgro
 .mft{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 20px 18px;border-top:1px solid var(--line2);margin-top:8px}
 .mft-r{display:flex;gap:9px;margin-left:auto}
 
+/* ---------- SELETOR DE SETOR (rail) ---------- */
+/* Botão do setor ativo + lista ao lado, no espírito do seletor de subcontas
+   do GHL: um clique mostra tudo o que a pessoa pode acessar. */
+.sectorbtn{display:flex;align-items:center;gap:10px;width:calc(100% - 28px);margin:0 14px 10px;padding:9px 11px;border-radius:11px;border:1px solid var(--line2);background:var(--sb2);color:var(--ink);text-align:left;transition:.14s}
+.sectorbtn:hover{border-color:var(--yellow-line);background:var(--panel2)}
+.sectorbtn.solo{cursor:default}
+.sectorbtn.solo:hover{border-color:var(--line2);background:var(--sb2)}
+.sectorbtn .sb-ic{width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--yellow-soft);color:var(--yellow)}
+.sectorbtn .sb-tx{min-width:0;flex:1}
+.sectorbtn .sb-n{display:block;font-size:13px;font-weight:700;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sectorbtn .sb-d{display:block;font-size:10.5px;color:var(--mut2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sectorbtn .sb-ch{color:var(--mut);flex:0 0 auto}
+.sec-opt{display:flex;align-items:center;gap:10px;margin:4px 6px;padding:9px 10px;border-radius:10px;cursor:pointer;transition:.12s}
+.sec-opt:hover{background:var(--panel2)}
+.sec-opt.on{background:var(--yellow-soft)}
+.sec-opt .sb-ic{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--panel3);color:var(--yellow)}
+.sec-opt .tx{min-width:0;flex:1}
+.sec-opt .t{font-size:13px;font-weight:600}
+.sec-opt .m{font-size:11px;color:var(--mut2)}
+.sec-opt .i{color:var(--yellow)}
+
 /* ---------- NOTIF POP ---------- */
 .pop{position:fixed;left:74px;bottom:64px;z-index:650;width:330px;max-height:60vh;overflow:auto;background:var(--panel);border:1px solid var(--line2);border-radius:14px;box-shadow:var(--sh-lg)}
 .np-h{display:flex;align-items:center;gap:8px;padding:13px 15px;border-bottom:1px solid var(--line2);font-weight:700;font-size:14px}
@@ -268,6 +289,10 @@ select.select{appearance:none;-webkit-appearance:none;padding-right:30px;backgro
 .nic{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--panel3)}
 .nt{font-size:13px;font-weight:500;line-height:1.35}
 .nd{font-size:11px;color:var(--mut2);margin-top:2px}
+/* o popover de setor abre ao LADO da rail (262px), alinhado ao botão (top via JS) */
+.secpop{left:270px;bottom:auto;width:290px}
+.secpop .pop-h{padding:12px 15px 8px;font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut2)}
+.secpop .pop-f{padding:8px 15px 12px;font-size:11.5px;color:var(--mut2);border-top:1px solid var(--line2)}
 
 /* ---------- SWITCH de tema ---------- */
 .theme-row{display:flex;align-items:center;gap:9px;padding:8px 10px;color:var(--mut);font-size:13px;font-weight:500}
@@ -519,6 +544,8 @@ img.pp-media.zoomable{cursor:zoom-in}
  .kpi .kv{font-size:28px}
  /* o sino fica na topbar (topo) → o pop vira folha inferior, no alcance do polegar */
  .pop{left:8px;right:8px;bottom:8px;width:auto;max-height:70dvh}
+ /* na gaveta não há espaço "ao lado": o seletor de setor também vira folha */
+ .secpop{left:8px;right:8px;bottom:8px;top:auto!important;width:auto}
  /* tabela rola dentro do painel em vez de espremer as colunas */
  .bd:has(>.tbl),.mbd:has(>.tbl){overflow-x:auto}
  .bd:has(>.tbl) .tbl,.mbd:has(>.tbl) .tbl{min-width:max-content}

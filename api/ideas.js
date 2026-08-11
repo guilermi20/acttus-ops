@@ -1,22 +1,27 @@
-import { sql, requireAuth } from '../lib/db.js';
+import { sql, requireAuthUser } from '../lib/db.js';
+import { sectorsOf, validSector } from '../lib/sectors.js';
 
-const SEL = `select i.id, i.client_id, i.title, i.notes, i.status, i.source, i.created_at,
+const SEL = `select i.id, i.client_id, i.title, i.notes, i.status, i.source, i.sector, i.created_at,
   c.name as client_name, c.is_internal
   from ideas i left join clients c on c.id = i.client_id`;
 
 export default async function handler(req, res) {
-  if (!requireAuth(req, res)) return;
+  const me = await requireAuthUser(req, res);
+  if (!me) return;
+  const mine = sectorsOf(me); // ideias pertencem ao setor em que foram criadas
   try {
     if (req.method === 'GET') {
-      const { rows } = await sql(SEL + ' order by i.created_at desc');
+      const { rows } = await sql(SEL + ' where i.sector = any($1::text[]) order by i.created_at desc', [mine]);
       return res.status(200).json(rows);
     }
     if (req.method === 'POST') {
       const b = req.body || {};
       const title = String(b.title || '').trim();
       if (!title) return res.status(400).json({ error: 'Título é obrigatório' });
-      const ins = await sql`insert into ideas (client_id, title, notes, status, source)
-        values (${b.client_id || null}, ${title}, ${String(b.notes || '')}, 'nova', 'interno') returning id`;
+      const sector = validSector(b.sector) || mine[0];
+      if (!mine.includes(sector)) return res.status(403).json({ error: 'Você não tem acesso ao setor "' + sector + '"' });
+      const ins = await sql`insert into ideas (client_id, title, notes, status, source, sector)
+        values (${b.client_id || null}, ${title}, ${String(b.notes || '')}, 'nova', 'interno', ${sector}) returning id`;
       const f = await sql(SEL + ' where i.id = $1', [ins.rows[0].id]);
       return res.status(201).json(f.rows[0]);
     }
@@ -33,7 +38,8 @@ export default async function handler(req, res) {
       if (!keys.length) return res.status(400).json({ error: 'Nada para atualizar' });
       const sets = keys.map((k, i) => k + ' = $' + (i + 1)).join(', ');
       const vals = keys.map((k) => f[k]); vals.push(id);
-      const upd = await sql('update ideas set ' + sets + ' where id = $' + vals.length + ' returning id', vals);
+      const idPos = vals.length; vals.push(mine);
+      const upd = await sql('update ideas set ' + sets + ' where id = $' + idPos + ' and sector = any($' + vals.length + '::text[]) returning id', vals);
       if (!upd.rows.length) return res.status(404).json({ error: 'Ideia não encontrada' });
       const ff = await sql(SEL + ' where i.id = $1', [id]);
       return res.status(200).json(ff.rows[0]);
@@ -41,7 +47,8 @@ export default async function handler(req, res) {
     if (req.method === 'DELETE') {
       const id = req.query && req.query.id;
       if (!id) return res.status(400).json({ error: 'id é obrigatório' });
-      await sql('delete from ideas where id = $1', [id]);
+      const dl = await sql('delete from ideas where id = $1 and sector = any($2::text[]) returning id', [id, mine]);
+      if (!dl.rows.length) return res.status(404).json({ error: 'Ideia não encontrada' });
       return res.status(200).json({ ok: true });
     }
     return res.status(405).json({ error: 'método não permitido' });

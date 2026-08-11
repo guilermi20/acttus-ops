@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/styles.css?v=9">
+<link rel="stylesheet" href="/styles.css?v=10">
 <script>
 function acttusShowErr(msg){
   if(/ResizeObserver loop/i.test(String(msg)))return; // aviso benigno do navegador — ignora
@@ -44,6 +44,7 @@ window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;acttu
  <div class="scrim" id="scrim"></div>
  <aside class="rail">
   <div class="brand"><span class="av brand-logo"><img src="/logo.png" alt="Acttus" onerror="var s=this.parentNode;s.classList.remove('brand-logo');s.textContent='A'"></span><div><div class="nm">Acttus</div><div class="sub">Calendário editorial</div></div></div>
+  <button type="button" class="sectorbtn" id="sectorBtn" aria-haspopup="true" aria-expanded="false" aria-controls="sectorpop"></button>
   <div class="railact"><button class="btn pri sm" id="btnCriar"></button><button class="bell" id="btnBell"><span id="bellIc"></span><span class="bdot" id="bellDot" hidden>0</span></button></div>
   <nav class="nav sb-scroll" id="nav"></nav>
   <div class="railfoot"><div class="theme-row"><span id="themeIc"></span> Modo escuro <button class="switch on" id="themeSwitch" type="button" role="switch" aria-label="Alternar tema claro/escuro"></button></div><div class="merow" id="meRow"></div><div class="out" id="logout"><span id="outIc"></span> Sair</div></div>
@@ -63,8 +64,9 @@ window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;acttu
 <div class="toast" id="toast"></div>
 <div class="modal" id="modal"><div class="mbg" id="modalBg"></div><div class="mbox" id="mboxc"></div></div>
 <div class="pop" id="notifpop" hidden></div>
+<div class="pop secpop" id="sectorpop" hidden></div>
 
-<script src="/data.js?v=9"></script>
-<script src="/app.js?v=9"></script>
+<script src="/data.js?v=10"></script>
+<script src="/app.js?v=10"></script>
 </body>
 </html>

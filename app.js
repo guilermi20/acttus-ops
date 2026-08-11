@@ -36,7 +36,9 @@ var ICONS = {
  key:'<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>',
  menu:'<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>',
  video:'<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>',
- agenda:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="7" y1="14" x2="12" y2="14"/><line x1="7" y1="18" x2="15" y2="18"/>'
+ target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>',
+ swap:'<polyline points="7 9 4 12 7 15"/><line x1="4" y1="12" x2="14" y2="12"/><polyline points="17 5 20 8 17 11"/><line x1="20" y1="8" x2="10" y2="8"/>',
+ megaphone:'<path d="M3 11v2a1 1 0 0 0 1 1h3l7 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M18 8a4 4 0 0 1 0 8"/>'
 };
 function ic(n, s) { return '<svg class="i" width="' + (s || 18) + '" height="' + (s || 18) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[n] || ICONS.dot) + '</svg>'; }
 
@@ -97,44 +99,132 @@ function avatar(name, sz) { sz = sz || 26; return '<span class="avt" title="' + 
 /* ===================================================================
    ROUTER
    =================================================================== */
+// `sectors` limita o item ao(s) setor(es) indicado(s); sem a chave, aparece em
+// todos. O setor ativo mora no Store (data.js), que também filtra os dados.
 var NAV = [
- { sec: 'Editorial', items: [{ key: 'calendario', label: 'Calendário', icon: 'calendar' }, { key: 'posts', label: 'Posts', icon: 'grid' }, { key: 'minhas', label: 'Minhas demandas', icon: 'check' }, { key: 'rotinas', label: 'Rotinas', icon: 'clock' }, { key: 'ideias', label: 'Banco de ideias', icon: 'zap' }] },
- { sec: 'Operação', items: [{ key: 'agenda', label: 'Agenda', icon: 'agenda' }, { key: 'gravacoes', label: 'Gravações', icon: 'video' }, { key: 'projetos', label: 'Projetos', icon: 'folder' }, { key: 'reunioes', label: 'Reuniões', icon: 'book' }] },
+ { sec: 'Editorial', sectors: ['marketing'], items: [{ key: 'calendario', label: 'Calendário', icon: 'calendar' }, { key: 'posts', label: 'Posts', icon: 'grid' }, { key: 'minhas', label: 'Minhas demandas', icon: 'check' }, { key: 'ideias', label: 'Banco de ideias', icon: 'zap' }] },
+ { sec: 'Tráfego', sectors: ['trafego'], items: [{ key: 'campanhas', label: 'Campanhas', icon: 'target' }] },
+ { sec: 'Operação', items: [{ key: 'rotinas', label: 'Rotinas', icon: 'clock' }, { key: 'gravacoes', label: 'Gravações', icon: 'video', sectors: ['marketing'] }, { key: 'projetos', label: 'Projetos', icon: 'folder' }, { key: 'reunioes', label: 'Reuniões', icon: 'book' }] },
  { sec: 'Cadastros', items: [{ key: 'clientes', label: 'Clientes', icon: 'building' }, { key: 'usuarios', label: 'Usuários', icon: 'users' }] },
  { sec: 'Integrações', admin: true, items: [{ key: 'api', label: 'API & Integrações', icon: 'key' }] }
 ];
-var VIEWS = { calendario: renderCalendario, posts: renderPosts, minhas: renderMinhas, rotinas: renderRotinas, ideias: renderIdeias, agenda: renderAgenda, gravacoes: renderGravacoes, projetos: renderProjetos, projeto: renderProjeto, reunioes: renderReunioes, reuniao: renderReuniao, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios, api: renderApiKeys };
+var VIEWS = { calendario: renderCalendario, posts: renderPosts, minhas: renderMinhas, rotinas: renderRotinas, ideias: renderIdeias, gravacoes: renderGravacoes, campanhas: renderCampanhas, campanha: renderCampanha, projetos: renderProjetos, projeto: renderProjeto, reunioes: renderReunioes, reuniao: renderReuniao, clientes: renderClientes, cliente: renderCliente, usuarios: renderUsuarios, api: renderApiKeys };
 var ADMIN_ROUTES = { api: 1 };
 var route = 'calendario';
 
 function isAdmin() { return !!(st.user && st.user.role === 'admin'); }
+function sector() { return st.sector; }
+function sectorMeta(key) { for (var i = 0; i < S.SECTORS.length; i++) if (S.SECTORS[i].key === key) return S.SECTORS[i]; return { key: key, label: key, desc: '' }; }
+// Item/seção visível no setor ativo? (sem `sectors` = aparece em todos)
+function inSector(x) { return !x.sectors || x.sectors.indexOf(sector()) >= 0; }
+// Rotas de detalhe seguem o pai (ex.: a ficha da campanha vive no Tráfego).
+var ROUTE_PARENT = { cliente: 'clientes', projeto: 'projetos', reuniao: 'reunioes', campanha: 'campanhas' };
+function routeAllowed(v) {
+ var key = ROUTE_PARENT[v] || v;
+ for (var i = 0; i < NAV.length; i++) {
+  var g = NAV[i];
+  if (g.admin && !isAdmin()) continue;
+  if (!inSector(g)) continue;
+  for (var j = 0; j < g.items.length; j++) if (g.items[j].key === key) return inSector(g.items[j]);
+ }
+ return false;
+}
+// Primeira rota disponível no setor ativo — destino de quem cai numa rota que
+// o setor não tem (ex.: trocar de Marketing para Tráfego estando no Calendário).
+function firstRoute() {
+ for (var i = 0; i < NAV.length; i++) {
+  var g = NAV[i];
+  if ((g.admin && !isAdmin()) || !inSector(g)) continue;
+  for (var j = 0; j < g.items.length; j++) if (inSector(g.items[j])) return g.items[j].key;
+ }
+ return 'clientes';
+}
 // No celular a rail é uma gaveta por cima do conteúdo — navegar tem que fechá-la.
 function setNav(open) {
  var a = $('#app'); if (!a) return;
  a.classList.toggle('navopen', !!open);
  var b = $('#btnMenu'); if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
-function go(v) { if (ADMIN_ROUTES[v] && !isAdmin()) v = 'calendario'; route = v; setNav(false); renderNav(); renderView(); }
+function go(v) {
+ if (ADMIN_ROUTES[v] && !isAdmin()) v = firstRoute();
+ if (!routeAllowed(v)) v = firstRoute();
+ route = v; setNav(false); renderNav(); renderView();
+}
 function renderNav() {
  var h = '';
  NAV.forEach(function (g) {
   if (g.admin && !isAdmin()) return;
+  if (!inSector(g)) return;
+  var items = g.items.filter(function (it) { return (!it.admin || isAdmin()) && inSector(it); });
+  if (!items.length) return;
   h += '<div class="navsec">' + esc(g.sec) + '</div>';
-  g.items.forEach(function (it) {
-   if (it.admin && !isAdmin()) return;
+  items.forEach(function (it) {
    var cnt = navCount(it.key);
-   var on = route === it.key || (route === 'cliente' && it.key === 'clientes') || (route === 'projeto' && it.key === 'projetos') || (route === 'reuniao' && it.key === 'reunioes');
+   var on = route === it.key || ROUTE_PARENT[route] === it.key;
    h += '<div class="navitem' + (on ? ' on' : '') + '" data-go="' + it.key + '">' + ic(it.icon, 18) + '<span>' + esc(it.label) + '</span>' + (cnt ? '<span class="cnt">' + cnt + '</span>' : '') + '</div>';
   });
  });
  $('#nav').innerHTML = h;
  $$('#nav .navitem').forEach(function (n) { n.onclick = function () { go(n.getAttribute('data-go')); }; });
+ renderSectorBtn();
+ renderCreateBtn();
+}
+
+/* ---------- seletor de setor (inspirado no seletor de subcontas do GHL) ----
+   Botão fixo no topo da rail com o setor ativo; ao clicar, abre a lista ao
+   lado. Quem só tem um setor vê apenas o rótulo, sem o menu. */
+function renderSectorBtn() {
+ var b = $('#sectorBtn'); if (!b) return;
+ var list = S.mySectors(), m = sectorMeta(sector()), only = list.length < 2;
+ b.className = 'sectorbtn' + (only ? ' solo' : '');
+ b.innerHTML = '<span class="sb-ic">' + ic(sector() === 'trafego' ? 'megaphone' : 'zap', 16) + '</span>' +
+  '<span class="sb-tx"><span class="sb-n">' + esc(m.label) + '</span><span class="sb-d">' + esc(m.desc || '') + '</span></span>' +
+  (only ? '' : '<span class="sb-ch">' + ic('swap', 15) + '</span>');
+ b.setAttribute('aria-expanded', 'false');
+ b.onclick = only ? null : toggleSectorPop;
+ b.disabled = only;
+}
+function closeSectorPop() {
+ var p = $('#sectorpop'); if (p) p.hidden = true;
+ var b = $('#sectorBtn'); if (b) b.setAttribute('aria-expanded', 'false');
+}
+function toggleSectorPop() {
+ var p = $('#sectorpop'); if (!p) return;
+ if (!p.hidden) { closeSectorPop(); return; }
+ var cur = sector();
+ p.innerHTML = '<div class="pop-h">Trocar de setor</div>' +
+  S.mySectors().map(function (k) {
+   var m = sectorMeta(k);
+   return '<div class="sec-opt' + (k === cur ? ' on' : '') + '" data-sec="' + k + '">' +
+    '<span class="sb-ic">' + ic(k === 'trafego' ? 'megaphone' : 'zap', 16) + '</span>' +
+    '<div class="tx"><div class="t">' + esc(m.label) + '</div><div class="m">' + esc(m.desc || '') + '</div></div>' +
+    (k === cur ? ic('check', 15) : '') + '</div>';
+  }).join('') +
+  (isAdmin() ? '<div class="pop-f">Você é admin: transita em todos os setores.</div>' : '');
+ // Posiciona o popover ao lado do botão (como o menu de subcontas do GHL).
+ var r = $('#sectorBtn').getBoundingClientRect();
+ p.style.top = Math.max(8, r.top) + 'px';
+ p.hidden = false;
+ $('#sectorBtn').setAttribute('aria-expanded', 'true');
+ $$('#sectorpop [data-sec]').forEach(function (o) {
+  o.onclick = function () {
+   var k = o.getAttribute('data-sec');
+   closeSectorPop();
+   if (k === sector()) return;
+   S.setSector(k);
+   if (!routeAllowed(route)) route = firstRoute();
+   setNav(false);
+   renderNav(); renderView();
+   toast('Setor: ' + sectorMeta(k).label);
+  };
+ });
 }
 function navCount(k) {
  if (k === 'posts') return st.posts.filter(function (p) { return (p.kind || 'post') === 'post'; }).length;
  if (k === 'minhas') return st.posts.filter(function (p) { return st.user && p.responsible_id === st.user.id; }).length;
  if (k === 'rotinas') return st.routines.filter(function (r) { return st.user && r.owner_id === st.user.id && !r.done; }).length;
  if (k === 'ideias') return st.ideas.filter(function (i) { return i.status === 'nova'; }).length;
+ if (k === 'campanhas') return st.campaigns.filter(function (c) { return c.status !== 'Encerrada'; }).length;
  if (k === 'clientes') return st.clients.length;
  if (k === 'usuarios') return st.users.length;
  if (k === 'api') return st.apiKeys.filter(function (x) { return !x.revoked_at; }).length;
@@ -487,71 +577,14 @@ function postCard(p) {
 }
 
 /* ===================================================================
-   CLIENTES
-   =================================================================== */
-/* ===================================================================
-   AGENDA (Google Calendar — o backend lê o feed iCal; o front só desenha)
+   GRAVAÇÕES — agenda do Google (visualização) + Calendly (agendamento)
+   Esta é a agenda do app: a aba "Agenda" (feed iCal) foi removida por fazer
+   o mesmo papel.
    =================================================================== */
 var TZ_AG = 'America/Fortaleza';
-var agData = null; // o polling re-renderiza a cada 8s: sem cache, baixaria o feed toda vez
-
-// Evento "flutuante" não tem fuso — a hora que veio É a hora de parede. Não converte.
-function agDate(e) { return new Date(e.floating ? e.start + 'Z' : e.start); }
-function agFmt(e, opt) { return new Intl.DateTimeFormat('pt-BR', Object.assign({ timeZone: TZ_AG }, opt)).format(agDate(e)); }
-function agDayKey(e) {
- if (e.allDay) return e.start;
- if (e.floating) return e.start.slice(0, 10);
- return new Intl.DateTimeFormat('en-CA', { timeZone: TZ_AG, year: 'numeric', month: '2-digit', day: '2-digit' }).format(agDate(e));
-}
-function agTime(e) {
- if (e.allDay) return 'dia todo';
- if (e.floating) return e.start.slice(11, 16);
- return agFmt(e, { hour: '2-digit', minute: '2-digit' });
-}
-function agTodayKey() { return new Intl.DateTimeFormat('en-CA', { timeZone: TZ_AG, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); }
-function agDayLabel(key) {
- var d = diffDays(agTodayKey(), key);
- if (d === 0) return 'Hoje';
- if (d === 1) return 'Amanhã';
- if (d === -1) return 'Ontem';
- return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'long' }).format(new Date(key + 'T12:00:00Z'));
-}
-
-function renderAgenda(el) {
- el.innerHTML = head('Agenda', 'Compromissos de contato@acttusco.com — próximos 60 dias.',
-  '<button class="btn" id="agRel">' + ic('clock', 15) + ' Atualizar</button>') +
-  '<div id="agBody"><div class="panel"><div class="bd"><div class="empty">Carregando agenda…</div></div></div></div>';
- $('#agRel', el).onclick = function () { agData = null; renderAgenda($('#view')); };
- if (agData) { paintAgenda(); return; }
- S.agenda().then(function (d) { agData = d; if (route === 'agenda') paintAgenda(); })
-  .catch(function (e) {
-   var b = $('#agBody'); if (!b) return;
-   b.innerHTML = '<div class="note rej">' + ic('alert', 16) + '<div>Não foi possível carregar a agenda: ' + esc(e.message) + '</div></div>';
-  });
-}
-function paintAgenda() {
- var b = $('#agBody'); if (!b || !agData) return;
- var d = agData, warn = '';
- if (d.masked) warn += '<div class="note rej">' + ic('alert', 16) + '<div><b>A agenda está em modo livre/ocupado.</b> O Google mascara todos os ' + d.total + ' títulos como “Busy”. Troque <code>GCAL_ICS_URL</code> pelo endereço <b>particular</b> no formato iCal (o que tem <code>private-…</code> no lugar de <code>public</code>) e refaça o deploy.</div></div>';
- if (d.rrule) warn += '<div class="note">' + ic('alert', 16) + '<div>' + d.rrule + ' evento(s) recorrente(s) vieram sem expansão e podem aparecer só na 1ª ocorrência.</div></div>';
- if (!d.events.length) { b.innerHTML = warn + '<div class="panel"><div class="bd"><div class="empty">Nada agendado nos próximos 60 dias.</div></div></div>'; return; }
- var byDay = {}, order = [];
- d.events.forEach(function (e) { var k = agDayKey(e); if (!byDay[k]) { byDay[k] = []; order.push(k); } byDay[k].push(e); });
- var html = order.map(function (k) {
-  return '<div class="ag-day"><div class="ag-dh">' + esc(agDayLabel(k)) + '<span class="ag-dc">' + byDay[k].length + '</span></div>' +
-   byDay[k].map(function (e) {
-    return '<div class="lrow ag-ev"><span class="ag-t">' + esc(agTime(e)) + '</span>' +
-     '<div class="tx"><div class="t">' + esc(e.title) + '</div>' +
-     (e.location ? '<div class="m">' + esc(e.location) + '</div>' : '') + '</div></div>';
-   }).join('') + '</div>';
- }).join('');
- b.innerHTML = warn + '<div class="panel"><div class="bd">' + html + '</div></div>';
-}
-
-/* ===================================================================
-   GRAVAÇÕES — agenda do Google (visualização) + Calendly (agendamento)
-   =================================================================== */
 var GRAV_CAL = 'c_e9eb0aa0d624ca7599756ac116a676f209c8957e9886f20b9745a9c67d696048@group.calendar.google.com';
+// Mesmo link usado no aviso de novo onboarding (lib/ghlWebhook.js): é a mesma
+// equipe que faz a gravação e a reunião de onboarding.
 var CALENDLY_URL = 'https://calendly.com/contato-acttusco/gravacao';
 
 // O embed do Google não é responsivo: a grade da semana fica ilegível no
@@ -697,7 +730,8 @@ function renderUsuarios(el) {
    else if (uk) kb = '<span class="pill" title="Esta chave não guardou o texto — gere outra para poder copiar">chave sem cópia</span>';
    else kb = '<button class="btn sm" data-genkey="' + u.id + '" title="Gerar uma chave de API para este usuário">' + ic('key', 13) + ' gerar chave</button>';
   }
-  return '<div class="lrow click" data-usr="' + u.id + '">' + avatar(u.name, 30) + '<div class="tx"><div class="t">' + esc(u.name) + '</div><div class="m">' + esc(u.email) + '</div></div><div class="rt">' + kb + '<span class="open-link">editar ' + ic('edit', 13) + '</span></div></div>';
+  var secs = u.role === 'admin' ? 'todos os setores' : (u.sectors || ['marketing']).map(function (k) { return sectorMeta(k).label; }).join(' · ');
+  return '<div class="lrow click" data-usr="' + u.id + '">' + avatar(u.name, 30) + '<div class="tx"><div class="t">' + esc(u.name) + '</div><div class="m">' + esc(u.email) + ' · ' + esc(secs) + '</div></div><div class="rt">' + kb + '<span class="open-link">editar ' + ic('edit', 13) + '</span></div></div>';
  }).join('') || '<div class="empty">Nenhum usuário ainda.</div>';
  el.innerHTML = head('Usuários', 'Quem acessa o sistema. Clique num usuário para editar. Login = CPF + email.',
   '<button class="btn pri" id="newUsr">' + ic('plus') + ' Novo usuário</button>') +
@@ -715,13 +749,23 @@ function openUserModal(user) {
   '<label class="fld"><span>CPF</span><input id="uCpf" inputmode="numeric" value="' + esc(u.cpf || '') + '" placeholder="000.000.000-00"></label>' +
   '<label class="fld"><span>Email</span><input id="uEmail" type="email" value="' + esc(u.email || '') + '" placeholder="pessoa@acttus.com.br"></label>' +
   '<label class="fld"><span>Telefone (com DDI — usado nos avisos de rotina no WhatsApp)</span><input id="uPhone" inputmode="numeric" value="' + esc(u.phone || '') + '" placeholder="5511999999999"></label>' +
-  (isAdmin() ? '<label class="fld"><span>Perfil</span><select id="uRole"><option value="member"' + (u.role !== 'admin' ? ' selected' : '') + '>Membro</option><option value="admin"' + (u.role === 'admin' ? ' selected' : '') + '>Admin (vê API &amp; Integrações)</option></select></label>' : ''),
+  (isAdmin() ? '<label class="fld"><span>Perfil</span><select id="uRole"><option value="member"' + (u.role !== 'admin' ? ' selected' : '') + '>Membro</option><option value="admin"' + (u.role === 'admin' ? ' selected' : '') + '>Admin (vê API &amp; Integrações)</option></select></label>' +
+   '<div class="fld"><span>Setores que acessa</span><div class="pchks" id="uSecs">' + S.SECTORS.map(function (s) {
+    var on = (u.sectors || ['marketing']).indexOf(s.key) >= 0;
+    return '<label class="chk"><input type="checkbox" value="' + s.key + '"' + (on ? ' checked' : '') + '> ' + esc(s.label) + '</label>';
+   }).join('') + '</div><div class="sub" style="margin-top:6px">Admin transita em todos os setores, independente do que estiver marcado.</div></div>' : ''),
   function () {
    var name = $('#uNome').value.trim(), cpf = onlyDigits($('#uCpf').value), email = $('#uEmail').value.trim();
    if (!name || !cpf || !email) { toast('Preencha nome, CPF e email', 'err'); return false; }
    if (cpf.length !== 11) { toast('CPF deve ter 11 dígitos', 'err'); return false; }
    var roleEl = $('#uRole');
    var payload = { name: name, cpf: cpf, email: email, phone: onlyDigits($('#uPhone').value), role: roleEl ? roleEl.value : (u.role || 'member') };
+   var secBox = $('#uSecs');
+   if (secBox) {
+    var secs = $$('#uSecs input:checked').map(function (i) { return i.value; });
+    if (!secs.length) { toast('Marque ao menos um setor', 'err'); return false; }
+    payload.sectors = secs;
+   }
    var op = editing ? S.updateUser(user.id, payload) : S.createUser(payload);
    op.then(function () { toast(editing ? 'Usuário atualizado' : 'Usuário criado'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); });
    return false;
@@ -1076,6 +1120,128 @@ function openTaskModal(task, projectId) {
  if (editing) $('#tkDel').onclick = function () { if (!confirm('Excluir esta tarefa?')) return; S.deleteProjectTask(task.id).then(function () { toast('Tarefa excluída'); closeModal(); }).catch(function (e) { toast(e.message, 'err'); }); };
 }
 
+/* ===================================================================
+   CAMPANHAS (área de Tráfego)
+   =================================================================== */
+var CAMP_STATUS = [
+ { key: 'Planejamento', color: 'gray' },
+ { key: 'Ativa', color: 'green' },
+ { key: 'Pausada', color: 'amber' },
+ { key: 'Encerrada', color: 'purple' }
+];
+var CAMP_PLATFORM = [
+ { key: 'meta', label: 'Meta (Facebook/Instagram)' },
+ { key: 'google', label: 'Google Ads' },
+ { key: 'tiktok', label: 'TikTok Ads' },
+ { key: 'linkedin', label: 'LinkedIn Ads' },
+ { key: 'outro', label: 'Outro' }
+];
+function campStatusColor(s) { for (var i = 0; i < CAMP_STATUS.length; i++) if (CAMP_STATUS[i].key === s) return CAMP_STATUS[i].color; return 'gray'; }
+function platformLabel(p) { for (var i = 0; i < CAMP_PLATFORM.length; i++) if (CAMP_PLATFORM[i].key === p) return CAMP_PLATFORM[i].label; return p || '—'; }
+function campById(id) { for (var i = 0; i < st.campaigns.length; i++) if (st.campaigns[i].id === id) return st.campaigns[i]; return null; }
+function fmtMoney(v) {
+ if (v == null || v === '') return '—';
+ var n = Number(v); if (!isFinite(n)) return '—';
+ return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function campPeriod(c) {
+ if (!c.start_date && !c.end_date) return 'sem período definido';
+ if (c.start_date && c.end_date) return fmtFull(c.start_date) + ' → ' + fmtFull(c.end_date);
+ return c.start_date ? 'desde ' + fmtFull(c.start_date) : 'até ' + fmtFull(c.end_date);
+}
+
+var campStatusFilter = '', campClient = '';
+function renderCampanhas(el) {
+ var list = st.campaigns.filter(function (c) {
+  if (campStatusFilter && c.status !== campStatusFilter) return false;
+  if (campClient && c.client_id !== campClient) return false;
+  return true;
+ });
+ var cards = list.map(function (c) {
+  return '<div class="card" data-camp="' + c.id + '"><div class="ct">' + ic('target', 20) + '</div>' +
+   '<h4>' + esc(c.name) + '</h4>' +
+   '<div class="m">' + esc(c.client_name || 'Sem cliente') + ' · ' + esc(platformLabel(c.platform)) + '</div>' +
+   '<div class="ft"><span class="bg c-' + campStatusColor(c.status) + '"><span class="bgdot"></span>' + esc(c.status) + '</span>' +
+   '<span class="sub">' + esc(fmtMoney(c.budget)) + '</span>' +
+   (c.responsible_name ? '<span class="sub">' + esc(c.responsible_name) + '</span>' : '') + '</div></div>';
+ }).join('') || '<div class="empty">' + (st.campaigns.length ? 'Nenhuma campanha com esses filtros.' : 'Nenhuma campanha ainda. Crie a primeira.') + '</div>';
+ var chips = [{ key: '', label: 'Todas', color: 'gray' }].concat(CAMP_STATUS.map(function (s) { return { key: s.key, label: s.key, color: s.color }; })).map(function (s) {
+  var n = s.key ? st.campaigns.filter(function (c) { return c.status === s.key; }).length : st.campaigns.length;
+  return '<button class="chip' + (campStatusFilter === s.key ? ' on c-' + s.color : '') + '" data-cst="' + esc(s.key) + '">' + esc(s.label) + ' <b>' + n + '</b></button>';
+ }).join('');
+ var cliOpts = '<option value="">Todos os clientes</option>' + st.clients.map(function (c) {
+  return '<option value="' + c.id + '"' + (campClient === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>';
+ }).join('');
+ var totalAtivo = st.campaigns.filter(function (c) { return c.status === 'Ativa'; }).reduce(function (a, c) { return a + (Number(c.budget) || 0); }, 0);
+ el.innerHTML = head('Campanhas', 'Mídia paga por cliente. Verba em campanhas ativas: ' + fmtMoney(totalAtivo) + '.',
+  '<select class="select" id="campCli">' + cliOpts + '</select>' +
+  '<button class="btn pri" id="newCamp">' + ic('plus') + ' Nova campanha</button>') +
+  '<div class="chips">' + chips + '</div>' +
+  '<div class="cards">' + cards + '</div>';
+ $('#newCamp', el).onclick = function () { openCampaignModal(null); };
+ $$('[data-cst]', el).forEach(function (b) { b.onclick = function () { campStatusFilter = b.getAttribute('data-cst'); renderCampanhas(el); }; });
+ var cs = $('#campCli', el); if (cs) cs.onchange = function () { campClient = this.value; renderCampanhas(el); };
+ $$('[data-camp]', el).forEach(function (c) { c.onclick = function () { openCampanha(c.getAttribute('data-camp')); }; });
+}
+var campanhaId = '';
+function openCampanha(id) { campanhaId = id; route = 'campanha'; renderNav(); renderView(); var sc = document.querySelector('.scroll'); if (sc) sc.scrollTop = 0; }
+function renderCampanha(el) {
+ var c = campById(campanhaId);
+ if (!c) { go('campanhas'); return; }
+ var linhas = [
+  ['Cliente', esc(c.client_name || '—')],
+  ['Plataforma', esc(platformLabel(c.platform))],
+  ['Objetivo', esc(c.objective || '—')],
+  ['Verba', esc(fmtMoney(c.budget))],
+  ['Período', esc(campPeriod(c))],
+  ['Responsável', esc(c.responsible_name || '—')]
+ ].map(function (l) { return '<tr><td>' + l[0] + '</td><td>' + l[1] + '</td></tr>'; }).join('');
+ el.innerHTML = head(c.name, c.status + ' · ' + (c.client_name || 'sem cliente'),
+  '<button class="btn" data-back="1">' + ic('left') + ' Voltar</button>' +
+  '<button class="btn pri" id="editCamp">' + ic('edit', 15) + ' Editar</button>') +
+  '<div class="panel"><div class="hd"><h3>Dados da campanha</h3><span class="sp"></span>' +
+   '<span class="bg c-' + campStatusColor(c.status) + '"><span class="bgdot"></span>' + esc(c.status) + '</span></div>' +
+   '<div class="bd"><table class="tbl"><tbody>' + linhas + '</tbody></table></div></div>' +
+  '<div class="panel"><div class="hd"><h3>Anotações</h3></div><div class="bd">' +
+   (c.notes ? '<div class="ata">' + esc(c.notes) + '</div>' : '<div class="empty">Sem anotações.</div>') + '</div></div>';
+ $('[data-back]', el).onclick = function () { go('campanhas'); };
+ $('#editCamp', el).onclick = function () { openCampaignModal(c); };
+}
+function openCampaignModal(camp) {
+ var c = camp || {}, editing = !!camp;
+ var cliOpts = '<option value="">Sem cliente</option>' + st.clients.map(function (x) { return '<option value="' + x.id + '"' + (x.id === (c.client_id || '') ? ' selected' : '') + '>' + esc(x.name) + '</option>'; }).join('');
+ var userOpts = '<option value="">Sem responsável</option>' + st.users.map(function (u) { return '<option value="' + u.id + '"' + (u.id === (c.responsible_id || '') ? ' selected' : '') + '>' + esc(u.name) + '</option>'; }).join('');
+ var platOpts = CAMP_PLATFORM.map(function (p) { return '<option value="' + p.key + '"' + ((c.platform || 'meta') === p.key ? ' selected' : '') + '>' + esc(p.label) + '</option>'; }).join('');
+ var stOpts = CAMP_STATUS.map(function (s) { return '<option' + ((c.status || 'Planejamento') === s.key ? ' selected' : '') + '>' + s.key + '</option>'; }).join('');
+ openModal(editing ? 'Editar campanha' : 'Nova campanha', ic('target'),
+  '<label class="fld"><span>Nome da campanha</span><input id="cpName" value="' + esc(c.name || '') + '" placeholder="Ex.: Captação — setembro"></label>' +
+  '<div class="mrow2"><label class="fld"><span>Cliente</span><select id="cpCli">' + cliOpts + '</select></label>' +
+  '<label class="fld"><span>Plataforma</span><select id="cpPlat">' + platOpts + '</select></label></div>' +
+  '<div class="mrow2"><label class="fld"><span>Status</span><select id="cpStatus">' + stOpts + '</select></label>' +
+  '<label class="fld"><span>Verba (R$)</span><input id="cpBudget" inputmode="decimal" value="' + esc(c.budget == null ? '' : c.budget) + '" placeholder="Ex.: 1500"></label></div>' +
+  '<div class="mrow2"><label class="fld"><span>Início</span><input type="date" id="cpStart" value="' + esc(c.start_date || '') + '"></label>' +
+  '<label class="fld"><span>Fim</span><input type="date" id="cpEnd" value="' + esc(c.end_date || '') + '"></label></div>' +
+  '<div class="mrow2"><label class="fld"><span>Responsável</span><select id="cpResp">' + userOpts + '</select></label>' +
+  '<label class="fld"><span>Objetivo</span><input id="cpObj" value="' + esc(c.objective || '') + '" placeholder="Ex.: leads no WhatsApp"></label></div>' +
+  '<label class="fld"><span>Anotações</span><textarea id="cpNotes" rows="3">' + esc(c.notes || '') + '</textarea></label>',
+  function () {
+   var name = $('#cpName').value.trim(); if (!name) { toast('Informe o nome da campanha', 'err'); return false; }
+   // aceita "1.500,50" (formato pt-BR) e "1500.50"
+   var raw = $('#cpBudget').value.trim().replace(/\./g, '').replace(',', '.');
+   var budget = raw === '' ? null : Number(raw);
+   if (budget !== null && !isFinite(budget)) { toast('Verba inválida', 'err'); return false; }
+   var payload = {
+    name: name, client_id: $('#cpCli').value || null, platform: $('#cpPlat').value,
+    status: $('#cpStatus').value, budget: budget, start_date: $('#cpStart').value || null,
+    end_date: $('#cpEnd').value || null, responsible_id: $('#cpResp').value || null,
+    objective: $('#cpObj').value, notes: $('#cpNotes').value
+   };
+   var op = editing ? S.updateCampaign(camp.id, payload) : S.createCampaign(payload);
+   op.then(function (nc) { toast(editing ? 'Campanha salva' : 'Campanha criada'); closeModal(); if (!editing && nc) openCampanha(nc.id); }).catch(function (e) { toast(e.message, 'err'); });
+   return false;
+  }, editing ? 'Salvar' : 'Criar campanha', editing ? '<button class="btn danger" id="cpDel">' + ic('trash', 15) + ' Excluir</button>' : '');
+ if (editing) $('#cpDel').onclick = function () { if (!confirm('Excluir esta campanha?')) return; S.deleteCampaign(camp.id).then(function () { toast('Campanha excluída'); closeModal(); go('campanhas'); }).catch(function (e) { toast(e.message, 'err'); }); };
+}
 
 /* ===================================================================
    BANCO DE IDEIAS
@@ -1270,22 +1436,33 @@ function applyTheme(t) {
 }
 function setTheme(t) { try { localStorage.setItem('acttus_theme', t); } catch (e) {} applyTheme(t); }
 
+// O botão de criação da rail segue o setor: post no Marketing, campanha no Tráfego.
+function createNew() { if (sector() === 'trafego') openCampaignModal(null); else openPostModal(null); }
+function renderCreateBtn() {
+ var b = $('#btnCriar'); if (!b) return;
+ b.innerHTML = ic('plus') + (sector() === 'trafego' ? ' Nova campanha' : ' Novo post');
+}
 function showApp() {
  $('#login').style.display = 'none';
  $('#app').hidden = false;
- $('#btnCriar').innerHTML = ic('plus') + ' Novo post';
  $('#bellIc').innerHTML = ic('bell', 18);
  $('#outIc').innerHTML = ic('logout', 16);
- $('#btnCriar').onclick = function () { openPostModal(null); };
+ $('#btnCriar').onclick = createNew;
  $('#btnBell').onclick = toggleNotifs;
  $('#logout').onclick = function () { S.logout(); location.reload(); };
  // topbar do celular: espelha as ações da rail (que está fechada na gaveta)
  $('#btnMenu').innerHTML = ic('menu', 20);
  $('#btnCriarM').innerHTML = ic('plus', 20);
  $('#btnMenu').onclick = function () { setNav(!$('#app').classList.contains('navopen')); };
- $('#scrim').onclick = function () { setNav(false); };
- $('#btnCriarM').onclick = function () { openPostModal(null); };
+ $('#scrim').onclick = function () { setNav(false); closeSectorPop(); };
+ $('#btnCriarM').onclick = createNew;
  $('#btnBellM').onclick = toggleNotifs;
+ // clique fora fecha o seletor de setor
+ document.addEventListener('click', function (e) {
+  var p = $('#sectorpop'); if (!p || p.hidden) return;
+  if (p.contains(e.target) || (e.target.closest && e.target.closest('#sectorBtn'))) return;
+  closeSectorPop();
+ });
  var sw = $('#themeSwitch'); if (sw) sw.onclick = function () { setTheme(document.body.classList.contains('light') ? 'dark' : 'light'); };
  applyTheme(currentTheme());
  renderMe(); renderNav(); renderView(); renderBell();

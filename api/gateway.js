@@ -16,6 +16,7 @@ import { requireApiKey, applyCors } from '../lib/apikey.js';
 import { REGISTRY } from '../lib/apiRegistry.js';
 import { discovery, openapi } from '../lib/apidocs.js';
 import { manageKeys } from '../lib/manageKeys.js';
+import { ghlWebhook } from '../lib/ghlWebhook.js';
 
 const MAX_LIMIT = 200;
 const DEFAULT_LIMIT = 50;
@@ -75,6 +76,10 @@ export function cleanBody(fields, body, partial) {
       case 'int':
         v = v == null || v === '' ? null : parseInt(v, 10);
         break;
+      case 'num': // decimal (ex.: verba de campanha) — parseInt perderia centavos
+        v = v == null || v === '' ? null : Number(v);
+        if (v !== null && !Number.isFinite(v)) { errors.push('"' + col + '" precisa ser um número'); continue; }
+        break;
       case 'json':
         v = JSON.stringify(v == null ? [] : v);
         jsonCols.push(col);
@@ -117,6 +122,14 @@ export default async function handler(req, res) {
       if (!key) return;
       const { rows } = await sql`select now() as now`;
       return sendJson(res, 200, { ok: true, key: { name: key.name, scopes: key.scopes }, now: rows[0].now });
+    }
+
+    // ---- webhooks de entrada: /api/v1/webhooks/{origem} --------------------
+    // Escrevem no banco, então exigem escopo write como qualquer POST.
+    if (resource === 'webhooks') {
+      if (!(await requireApiKey(req, res, 'write'))) return;
+      if (id === 'ghl') return ghlWebhook(req, res);
+      return sendJson(res, 404, { error: 'Webhook desconhecido. Disponível: POST /api/v1/webhooks/ghl' });
     }
 
     // ---- recurso válido? ---------------------------------------------------
